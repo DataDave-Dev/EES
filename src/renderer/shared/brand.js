@@ -1,12 +1,15 @@
-// Shared brand helper. Reads the company name from the main process and
-// applies it across the UI:
+// Shared brand helper. Reads the company name + optional logo from the main
+// process and applies them across the UI:
 //   - [data-brand-name]    : textContent becomes the company name.
-//   - [data-brand-initial] : textContent becomes the first letter (uppercase).
+//   - [data-brand-initial] : becomes the company logo image when one exists,
+//                            otherwise textContent becomes the first letter.
 //   - document.title       : the segment before " · " is replaced.
-// Falls back to 'Onix' when the IPC call fails (e.g. dev/edge cases).
+// Falls back to 'Onix' / letter when IPC fails or no logo is configured.
 window.EES_BRAND = (() => {
   const DEFAULT = 'Onix';
   let cachedName = null;
+  let cachedLogoUrl = null;
+  let cachedLogoFetched = false;
 
   async function fetchName() {
     if (cachedName) return cachedName;
@@ -19,17 +22,46 @@ window.EES_BRAND = (() => {
     return cachedName;
   }
 
-  function applyTo(root, name) {
-    const initial = (name[0] || 'O').toUpperCase();
+  async function fetchLogoUrl() {
+    if (cachedLogoFetched) return cachedLogoUrl;
+    try {
+      const res = await window.api.getCompanyLogo();
+      cachedLogoUrl = (res?.ok && res.dataUrl) ? res.dataUrl : null;
+    } catch {
+      cachedLogoUrl = null;
+    }
+    cachedLogoFetched = true;
+    return cachedLogoUrl;
+  }
+
+  function applyNames(root, name) {
     root.querySelectorAll('[data-brand-name]').forEach((el) => {
       el.textContent = name;
     });
+  }
+
+  function applyInitials(root, name, logoUrl) {
+    const initial = (name[0] || 'O').toUpperCase();
     root.querySelectorAll('[data-brand-initial]').forEach((el) => {
-      el.textContent = initial;
+      // Remove any prior injected <img>
+      el.querySelectorAll(':scope > .brand-logo-img').forEach((n) => n.remove());
+      if (logoUrl) {
+        el.classList.add('has-logo');
+        el.textContent = '';
+        const img = document.createElement('img');
+        img.className = 'brand-logo-img';
+        img.src = logoUrl;
+        img.alt = name;
+        img.draggable = false;
+        el.appendChild(img);
+      } else {
+        el.classList.remove('has-logo');
+        el.textContent = initial;
+      }
     });
   }
 
-  function applyToTitle(name) {
+  function applyTitle(name) {
     const t = document.title || '';
     if (!t) { document.title = name; return; }
     const parts = t.split(' · ');
@@ -42,19 +74,25 @@ window.EES_BRAND = (() => {
   }
 
   async function applyAll(opts = {}) {
-    if (opts.force) cachedName = null;
+    if (opts.force) {
+      cachedName = null;
+      cachedLogoUrl = null;
+      cachedLogoFetched = false;
+    }
     const name = await fetchName();
-    applyTo(document, name);
-    applyToTitle(name);
-    return name;
+    const logoUrl = await fetchLogoUrl();
+    applyNames(document, name);
+    applyInitials(document, name, logoUrl);
+    applyTitle(name);
+    return { name, logoUrl };
   }
 
   function getCachedName() { return cachedName || DEFAULT; }
+  function getCachedLogoUrl() { return cachedLogoUrl; }
 
-  return { applyAll, fetchName, getCachedName };
+  return { applyAll, fetchName, fetchLogoUrl, getCachedName, getCachedLogoUrl };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Best-effort: never block render on this.
   window.EES_BRAND.applyAll().catch(() => {});
 });

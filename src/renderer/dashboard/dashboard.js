@@ -2216,7 +2216,12 @@ function repSmExportPayload(format) {
 repSmXlsx.addEventListener('click', () => { const p = repSmExportPayload('xlsx'); if (p) handleExport('xlsx', p); });
 repSmPdf .addEventListener('click', () => { const p = repSmExportPayload('pdf');  if (p) handleExport('pdf',  p); });
 
-// ── Configuración general (empresa + horario laboral) ─────────
+// ── Configuración general (logo + empresa + horario laboral) ─
+const cfgLogoPreview    = document.getElementById('cfg-logo-preview');
+const cfgLogoFileInput  = document.getElementById('cfg-logo-file');
+const cfgLogoRemoveBtn  = document.getElementById('cfg-logo-remove-btn');
+const cfgLogoError      = document.getElementById('cfg-logo-error');
+const cfgLogoSuccess    = document.getElementById('cfg-logo-success');
 const cfgCompanyName     = document.getElementById('cfg-company-name');
 const cfgCompanySaveBtn  = document.getElementById('cfg-company-save-btn');
 const cfgCompanyError    = document.getElementById('cfg-company-error');
@@ -2264,11 +2269,16 @@ async function loadCfgSchedule() {
   cfgSuccess.classList.add('hidden');
   cfgCompanyError.classList.add('hidden');
   cfgCompanySuccess.classList.add('hidden');
+  cfgLogoError.classList.add('hidden');
+  cfgLogoSuccess.classList.add('hidden');
 
-  const [schedRes, nameRes] = await Promise.all([
+  const [schedRes, nameRes, logoRes] = await Promise.all([
     window.api.getWorkSchedule(),
     window.api.getCompanyName(),
+    window.api.getCompanyLogo(),
   ]);
+
+  refreshCfgLogoPreview(logoRes);
 
   if (!schedRes?.ok) {
     cfgError.textContent = schedRes?.error || 'No se pudo cargar el horario';
@@ -2289,6 +2299,100 @@ async function loadCfgSchedule() {
 
   cfgLoaded = true;
 }
+
+function refreshCfgLogoPreview(res) {
+  // Reset the preview to placeholder letter or show the image.
+  const hasLogo = !!(res?.ok && res.dataUrl);
+  cfgLogoPreview.querySelectorAll(':scope > img').forEach((n) => n.remove());
+  if (hasLogo) {
+    const ph = document.getElementById('cfg-logo-placeholder');
+    if (ph) ph.style.display = 'none';
+    const img = document.createElement('img');
+    img.src = res.dataUrl;
+    img.alt = 'Logo de la empresa';
+    img.draggable = false;
+    cfgLogoPreview.appendChild(img);
+    cfgLogoRemoveBtn.classList.remove('hidden');
+  } else {
+    const ph = document.getElementById('cfg-logo-placeholder');
+    if (ph) ph.style.display = '';
+    cfgLogoRemoveBtn.classList.add('hidden');
+  }
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('No se pudo leer el archivo'));
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      // result is "data:<mime>;base64,<b64>". Strip the prefix.
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+cfgLogoFileInput.addEventListener('change', async (e) => {
+  cfgLogoError.classList.add('hidden');
+  cfgLogoSuccess.classList.add('hidden');
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  // Client-side guard (backend also validates)
+  const MAX = 2 * 1024 * 1024;
+  if (file.size > MAX) {
+    cfgLogoError.textContent = 'La imagen supera el máximo de 2 MB';
+    cfgLogoError.classList.remove('hidden');
+    cfgLogoFileInput.value = '';
+    return;
+  }
+  const mime = (file.type || '').toLowerCase();
+  if (!['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'].includes(mime)) {
+    cfgLogoError.textContent = 'Formato no soportado. Usa PNG, JPG, SVG o WebP.';
+    cfgLogoError.classList.remove('hidden');
+    cfgLogoFileInput.value = '';
+    return;
+  }
+
+  try {
+    const base64 = await readFileAsBase64(file);
+    const res = await window.api.setCompanyLogo({ data: base64, mime });
+    if (!res?.ok) {
+      cfgLogoError.textContent = res?.error || 'No se pudo guardar el logo';
+      cfgLogoError.classList.remove('hidden');
+      return;
+    }
+    cfgLogoSuccess.classList.remove('hidden');
+    setTimeout(() => cfgLogoSuccess.classList.add('hidden'), 2500);
+    const logoRes = await window.api.getCompanyLogo();
+    refreshCfgLogoPreview(logoRes);
+    if (window.EES_BRAND?.applyAll) await window.EES_BRAND.applyAll({ force: true });
+  } catch (err) {
+    cfgLogoError.textContent = err?.message || 'Error al leer el archivo';
+    cfgLogoError.classList.remove('hidden');
+  } finally {
+    cfgLogoFileInput.value = '';
+  }
+});
+
+cfgLogoRemoveBtn.addEventListener('click', async () => {
+  cfgLogoError.classList.add('hidden');
+  cfgLogoSuccess.classList.add('hidden');
+  const ok = confirm('¿Quitar el logo actual? Se volverá a mostrar la inicial.');
+  if (!ok) return;
+  cfgLogoRemoveBtn.disabled = true;
+  const res = await window.api.removeCompanyLogo();
+  cfgLogoRemoveBtn.disabled = false;
+  if (!res?.ok) {
+    cfgLogoError.textContent = res?.error || 'No se pudo quitar';
+    cfgLogoError.classList.remove('hidden');
+    return;
+  }
+  refreshCfgLogoPreview({ ok: true, dataUrl: null });
+  if (window.EES_BRAND?.applyAll) await window.EES_BRAND.applyAll({ force: true });
+});
 
 cfgCompanySaveBtn.addEventListener('click', async () => {
   cfgCompanyError.classList.add('hidden');
@@ -2682,6 +2786,8 @@ const AUDIT_ACTION_LABELS = {
   'catalogo.delete':           'Catálogo · eliminación',
   'config.work_schedule_update': 'Horario laboral · cambio',
   'config.company_name_update':  'Nombre empresa · cambio',
+  'config.company_logo_update':  'Logo empresa · cambio',
+  'config.company_logo_remove':  'Logo empresa · eliminación',
 };
 function auditActionLabel(code) {
   return AUDIT_ACTION_LABELS[code] || code;

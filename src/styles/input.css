@@ -2683,6 +2683,72 @@ input:-webkit-autofill {
     justify-content: flex-end;
   }
 
+  /* Logo upload card */
+  .cfg-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  .cfg-logo-preview {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    border-radius: 18px;
+    background: var(--accent);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    box-shadow: 0 4px 14px var(--accent-ring);
+  }
+  .cfg-logo-preview .cfg-logo-placeholder {
+    font-size: 38px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .cfg-logo-preview > img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 8px;
+    background: var(--surface);
+  }
+  .cfg-logo-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 220px;
+  }
+  .cfg-logo-upload-btn {
+    cursor: pointer;
+    user-select: none;
+  }
+  .cfg-logo-remove-btn { margin-top: 2px; }
+
+  /* Brand logo inside [data-brand-initial] elements (sidebar/login/setup) */
+  [data-brand-initial].has-logo {
+    position: relative;
+    background: var(--surface) !important;
+    color: transparent;
+    overflow: hidden;
+  }
+  [data-brand-initial].has-logo > .brand-logo-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 4px;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
   /* ── Horas dentro/fuera (summary table) ────────────────── */
   .rep-hd-table tbody tr.rep-hd-row { cursor: pointer; }
   .rep-hd-table tbody tr.rep-hd-row:hover { background: var(--hover); }

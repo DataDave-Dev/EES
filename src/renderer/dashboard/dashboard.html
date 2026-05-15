@@ -650,6 +650,25 @@
           </div>
 
           <div class="settings-card cfg-card" style="margin-bottom: 14px;">
+            <div class="settings-section-title">Logo</div>
+            <div class="cfg-logo-row">
+              <div class="cfg-logo-preview" id="cfg-logo-preview" aria-live="polite">
+                <span class="cfg-logo-placeholder" id="cfg-logo-placeholder" data-brand-initial>O</span>
+              </div>
+              <div class="cfg-logo-actions">
+                <label class="btn-primary btn-primary--auto cfg-logo-upload-btn" for="cfg-logo-file">
+                  <span>Cargar imagen</span>
+                </label>
+                <input type="file" id="cfg-logo-file" accept="image/png,image/jpeg,image/svg+xml,image/webp" class="hidden" />
+                <button type="button" id="cfg-logo-remove-btn" class="btn-ghost-outline cfg-logo-remove-btn hidden">Quitar logo</button>
+                <p class="field-hint" style="margin: 4px 0 0;">PNG, JPG, SVG o WebP. Máximo 2 MB. Se usa en el sidebar, login, exportaciones y como inicial cuando no hay logo.</p>
+              </div>
+            </div>
+            <div id="cfg-logo-error" class="alert-error hidden" style="margin-top: 12px;"></div>
+            <div id="cfg-logo-success" class="alert-success hidden" style="margin-top: 12px;">Logo actualizado.</div>
+          </div>
+
+          <div class="settings-card cfg-card" style="margin-bottom: 14px;">
             <div class="settings-section-title">Empresa</div>
             <label class="field" style="max-width: 420px;">
               <span class="field-label">Nombre de la empresa</span>

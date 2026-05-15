@@ -635,6 +635,44 @@ function registerIpc() {
     })
   );
 
+  // Company logo: read is public (used by login/setup); write/remove are admin.
+  ipcMain.handle(
+    'configuracion:getCompanyLogo',
+    safe(async () => {
+      const info = configuracionLib.getCompanyLogoInfo();
+      const dataUrl = configuracionLib.getCompanyLogoDataUrl();
+      return { ok: true, exists: info.exists, mime: info.mime || null, size: info.size || 0, dataUrl };
+    })
+  );
+  ipcMain.handle(
+    'configuracion:setCompanyLogo',
+    requirePerm('usuarios', async (_e, payload = {}) => {
+      const r = configuracionLib.setCompanyLogo(payload || {});
+      if (r?.ok) {
+        auditAction('config.company_logo_update', {
+          entity_type: 'app_settings',
+          entity_label: 'company_logo',
+          details: { mime: r.mime, size_bytes: r.size },
+        });
+      }
+      return r;
+    })
+  );
+  ipcMain.handle(
+    'configuracion:removeCompanyLogo',
+    requirePerm('usuarios', async () => {
+      const had = configuracionLib.getCompanyLogoInfo().exists;
+      const r = configuracionLib.removeCompanyLogo();
+      if (r?.ok && had) {
+        auditAction('config.company_logo_remove', {
+          entity_type: 'app_settings',
+          entity_label: 'company_logo',
+        });
+      }
+      return r;
+    })
+  );
+
   // Auditoría
   ipcMain.handle(
     'audit:list',

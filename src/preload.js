@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld('api', {
   setWorkSchedule: (payload) => ipcRenderer.invoke('configuracion:setWorkSchedule', payload),
   getCompanyName: () => ipcRenderer.invoke('configuracion:getCompanyName'),
   setCompanyName: (name) => ipcRenderer.invoke('configuracion:setCompanyName', { name }),
+  getCompanyLogo: () => ipcRenderer.invoke('configuracion:getCompanyLogo'),
+  setCompanyLogo: (payload) => ipcRenderer.invoke('configuracion:setCompanyLogo', payload),
+  removeCompanyLogo: () => ipcRenderer.invoke('configuracion:removeCompanyLogo'),
 
   // Auditoría
   auditList: (opts) => ipcRenderer.invoke('audit:list', opts || {}),
