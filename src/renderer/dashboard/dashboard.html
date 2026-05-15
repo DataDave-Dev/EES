@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:" />
+  <title>Onix · Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../styles/output.css" />
+  <script src="../shared/theme.js"></script>
+</head>
+<body class="h-screen overflow-hidden">
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="identity-mark sidebar-mark">O</div>
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-title">Onix</div>
+          <div class="sidebar-brand-sub">Control de asistencia</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <button type="button" class="nav-item is-active" data-view="dashboard">
+          <span class="nav-icon" id="nav-icon-dashboard"></span>
+          <span class="nav-label">Dashboard</span>
+        </button>
+        <button type="button" class="nav-item" data-view="registro">
+          <span class="nav-icon" id="nav-icon-registro"></span>
+          <span class="nav-label">Registro</span>
+        </button>
+        <button type="button" class="nav-item" data-view="empleados">
+          <span class="nav-icon" id="nav-icon-empleados"></span>
+          <span class="nav-label">Empleados</span>
+        </button>
+        <div class="nav-group" id="nav-group-catalogos">
+          <button type="button" class="nav-item nav-group-toggle" data-group="catalogos" aria-expanded="false">
+            <span class="nav-icon" id="nav-icon-catalogos"></span>
+            <span class="nav-label">Catálogos</span>
+            <span class="nav-chevron" id="nav-icon-chevron-catalogos"></span>
+          </button>
+          <div class="nav-group-children">
+            <div class="nav-group-children-inner">
+              <button type="button" class="nav-item nav-sub" data-view="tipos-salida">
+                <span class="nav-icon" id="nav-icon-tipos-salida"></span>
+                <span class="nav-label">Motivos</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" id="nav-group-reportes">
+          <button type="button" class="nav-item nav-group-toggle" data-group="reportes" aria-expanded="false">
+            <span class="nav-icon" id="nav-icon-reportes"></span>
+            <span class="nav-label">Reportes</span>
+            <span class="nav-chevron" id="nav-icon-chevron-reportes"></span>
+          </button>
+          <div class="nav-group-children">
+            <div class="nav-group-children-inner">
+              <button type="button" class="nav-item nav-sub" data-view="rep-asistencia-dia">
+                <span class="nav-icon" id="nav-icon-rep-asistencia"></span>
+                <span class="nav-label">Asistencia del día</span>
+              </button>
+              <button type="button" class="nav-item nav-sub" data-view="rep-historial">
+                <span class="nav-icon" id="nav-icon-rep-historial"></span>
+                <span class="nav-label">Historial por empleado</span>
+              </button>
+              <button type="button" class="nav-item nav-sub" data-view="rep-salidas-motivo">
+                <span class="nav-icon" id="nav-icon-rep-salidas"></span>
+                <span class="nav-label">Salidas por motivo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" id="nav-group-config">
+          <button type="button" class="nav-item nav-group-toggle" data-group="config" aria-expanded="false">
+            <span class="nav-icon" id="nav-icon-configuracion"></span>
+            <span class="nav-label">Configuración</span>
+            <span class="nav-chevron" id="nav-icon-chevron"></span>
+          </button>
+          <div class="nav-group-children">
+            <div class="nav-group-children-inner">
+              <button type="button" class="nav-item nav-sub" data-view="usuarios">
+                <span class="nav-icon" id="nav-icon-usuarios"></span>
+                <span class="nav-label">Usuarios</span>
+              </button>
+              <button type="button" class="nav-item nav-sub" data-view="accesos">
+                <span class="nav-icon" id="nav-icon-accesos"></span>
+                <span class="nav-label">Accesos</span>
+              </button>
+              <button type="button" class="nav-item nav-sub" data-view="auditoria">
+                <span class="nav-icon" id="nav-icon-auditoria"></span>
+                <span class="nav-label">Auditoría</span>
+              </button>
+              <button type="button" class="nav-item nav-sub" data-view="apariencia">
+                <span class="nav-icon" id="nav-icon-apariencia"></span>
+                <span class="nav-label">Apariencia</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="sidebar-user-avatar" id="user-avatar">—</div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name" id="user-fullname">—</div>
+            <div class="sidebar-user-handle" id="user-username">—</div>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn-ghost sidebar-logout" title="Cerrar sesión" aria-label="Cerrar sesión">
+          <span id="icon-logout"></span>
+          <span class="nav-label">Cerrar sesión</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="app-main">
+      <header class="app-topbar">
+        <button id="sidebar-toggle" class="topbar-icon-btn" aria-label="Alternar menú">
+          <span id="icon-menu"></span>
+        </button>
+        <div class="app-topbar-title">
+          <span id="view-eyebrow" class="identity-sub" style="color: var(--accent);">Panel</span>
+          <h1 id="view-title">Dashboard</h1>
+        </div>
+      </header>
+
+      <div class="app-content">
+        <!-- Dashboard view -->
+        <section class="view is-active" data-view="dashboard">
+          <div class="dash-greeting">
+            <div>
+              <div class="identity-sub" style="color: var(--accent);">Resumen</div>
+              <h2 id="greeting" class="dash-greeting-title">Bienvenido</h2>
+            </div>
+            <button type="button" id="dash-refresh" class="users-refresh-link">Actualizar</button>
+          </div>
+
+          <!-- KPI cards -->
+          <div class="dash-kpis">
+            <div class="dash-kpi">
+              <span class="dash-kpi-label">Empleados activos</span>
+              <span class="dash-kpi-value" id="dash-kpi-activos">—</span>
+              <span class="dash-kpi-sub" id="dash-kpi-presentes">— presentes ahora</span>
+            </div>
+            <div class="dash-kpi dash-kpi--in">
+              <span class="dash-kpi-label">Entradas hoy</span>
+              <span class="dash-kpi-value" id="dash-kpi-entradas">—</span>
+              <span class="dash-kpi-sub">eventos del día</span>
+            </div>
+            <div class="dash-kpi dash-kpi--out">
+              <span class="dash-kpi-label">Salidas hoy</span>
+              <span class="dash-kpi-value" id="dash-kpi-salidas">—</span>
+              <span class="dash-kpi-sub">eventos del día</span>
+            </div>
+            <div class="dash-kpi dash-kpi--accent">
+              <span class="dash-kpi-label">Total eventos hoy</span>
+              <span class="dash-kpi-value" id="dash-kpi-total">—</span>
+              <span class="dash-kpi-sub">entrada + salida</span>
+            </div>
+          </div>
+
+          <div class="dash-grid-2">
+            <!-- Actividad reciente -->
+            <div class="window dash-card">
+              <div class="dash-card-head">
+                <h3 class="dash-card-title">Actividad reciente</h3>
+                <span class="dash-card-sub">últimos 8 eventos del día</span>
+              </div>
+              <ul id="dash-actividad" class="dash-activity">
+                <li class="dash-activity-empty">—</li>
+              </ul>
+            </div>
+
+            <!-- Salidas por motivo 7d -->
+            <div class="window dash-card">
+              <div class="dash-card-head">
+                <h3 class="dash-card-title">Salidas por motivo</h3>
+                <span class="dash-card-sub">últimos 7 días</span>
+              </div>
+              <div id="dash-motivos" class="dash-motivos">
+                <div class="dash-motivos-empty">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empleados presentes -->
+          <div class="window dash-card" style="margin-top: 18px;">
+            <div class="dash-card-head">
+              <h3 class="dash-card-title">Empleados presentes ahora</h3>
+              <span class="dash-card-sub" id="dash-presentes-count">—</span>
+            </div>
+            <div id="dash-presentes" class="dash-presentes">
+              <div class="dash-presentes-empty">—</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Registro view -->
+        <section class="view" data-view="registro">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Histórico de hoy</h2>
+              <p class="users-sub">
+                <span id="reg-log-count">—</span> eventos.
+                <button type="button" id="reg-log-refresh" class="users-refresh-link">Actualizar</button>
+              </p>
+            </div>
+            <button type="button" id="reg-open-new" class="btn-primary users-new-btn">
+              <span id="icon-reg-new"></span>
+              <span>Nuevo registro</span>
+            </button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table reg-log">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Fecha y hora</th>
+                    <th>Empleado</th>
+                    <th style="width: 11%;">Tipo</th>
+                    <th>Motivo</th>
+                    <th style="width: 14%;">Registró</th>
+                    <th class="users-actions-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="reg-log-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Empleados view -->
+        <section class="view" data-view="empleados">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Empleados</h2>
+              <p class="users-sub">
+                <span id="empleados-count">—</span> empleados registrados.
+                <button type="button" id="empleados-refresh" class="users-refresh-link">Actualizar</button>
+              </p>
+            </div>
+            <button type="button" id="empleados-new-btn" class="btn-primary users-new-btn">
+              <span id="icon-empleados-new"></span>
+              <span>Nuevo empleado</span>
+            </button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th style="width: 12%;">Número</th>
+                    <th style="width: 28%;">Nombre</th>
+                    <th>Puesto</th>
+                    <th>Departamento</th>
+                    <th style="width: 12%;">Estatus</th>
+                    <th class="users-actions-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="empleados-tbody">
+                  <tr class="users-empty-row"><td colspan="6">Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Motivos (sub-vista de Catálogos) -->
+        <section class="view" data-view="tipos-salida">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Motivos</h2>
+              <p class="users-sub">
+                <span id="tipos-count">—</span> motivos registrados. Aplica a entradas y salidas.
+                <button type="button" id="tipos-refresh" class="users-refresh-link">Actualizar</button>
+              </p>
+            </div>
+            <button type="button" id="tipos-new-btn" class="btn-primary users-new-btn">
+              <span id="icon-tipos-new"></span>
+              <span>Nuevo motivo</span>
+            </button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th class="users-actions-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="tipos-tbody">
+                  <tr class="users-empty-row"><td colspan="2">Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Usuarios view -->
+        <section class="view" data-view="usuarios">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Usuarios del sistema</h2>
+              <p class="users-sub">
+                <span id="users-count">—</span> cuentas registradas.
+                <button type="button" id="users-refresh" class="users-refresh-link">Actualizar</button>
+              </p>
+            </div>
+            <button type="button" id="users-new-btn" class="btn-primary users-new-btn">
+              <span id="icon-users-new"></span>
+              <span>Nuevo usuario</span>
+            </button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th style="width: 30%;">Usuario</th>
+                    <th style="width: 14%;">Estatus</th>
+                    <th>Última conexión</th>
+                    <th>Creado</th>
+                    <th class="users-actions-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody">
+                  <tr class="users-empty-row"><td colspan="5">Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Accesos view -->
+        <section class="view" data-view="accesos">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Accesos y permisos</h2>
+              <p class="users-sub">
+                Marca los módulos a los que cada usuario puede acceder.
+                <span id="perms-dirty-tag" class="perms-dirty-tag hidden">Sin guardar</span>
+              </p>
+            </div>
+            <button type="button" id="perms-save-btn" class="btn-primary users-new-btn" disabled>
+              <span>Guardar cambios</span>
+            </button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table perms-table">
+                <thead>
+                  <tr id="perms-head">
+                    <th style="width: 28%;">Usuario</th>
+                    <!-- Module columns injected here -->
+                  </tr>
+                </thead>
+                <tbody id="perms-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reporte: Asistencia del día -->
+        <section class="view" data-view="rep-asistencia-dia">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Asistencia del día</h2>
+              <p class="users-sub">Eventos de entrada y salida para una fecha específica.</p>
+            </div>
+            <div class="rep-toolbar-actions">
+              <button type="button" id="rep-ad-xlsx" class="rep-export-btn" disabled>
+                <span id="rep-ad-xlsx-icon"></span>
+                <span>Excel</span>
+              </button>
+              <button type="button" id="rep-ad-pdf" class="rep-export-btn" disabled>
+                <span id="rep-ad-pdf-icon"></span>
+                <span>PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="rep-filter-bar">
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Fecha</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-ad-fecha" class="rep-filter-input" />
+              </span>
+            </div>
+            <button type="button" id="rep-ad-buscar" class="btn-primary rep-generate-btn">Generar reporte</button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table reg-log">
+                <thead>
+                  <tr>
+                    <th style="width: 22%;">Fecha y hora</th>
+                    <th>Empleado</th>
+                    <th style="width: 12%;">Tipo</th>
+                    <th>Motivo</th>
+                    <th style="width: 16%;">Registró</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-ad-tbody">
+                  <tr class="users-empty-row"><td colspan="5">Selecciona una fecha y presiona Generar.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reporte: Historial por empleado -->
+        <section class="view" data-view="rep-historial">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Historial por empleado</h2>
+              <p class="users-sub">Eventos de un empleado en un rango de fechas.</p>
+            </div>
+            <div class="rep-toolbar-actions">
+              <button type="button" id="rep-hi-xlsx" class="rep-export-btn" disabled>
+                <span id="rep-hi-xlsx-icon"></span>
+                <span>Excel</span>
+              </button>
+              <button type="button" id="rep-hi-pdf" class="rep-export-btn" disabled>
+                <span id="rep-hi-pdf-icon"></span>
+                <span>PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="rep-filter-bar">
+            <div class="rep-filter-item" style="flex: 2 1 260px;">
+              <span class="rep-filter-item-label">Empleado</span>
+              <span class="rep-filter-shell select-shell">
+                <select id="rep-hi-empleado" class="rep-filter-input field-select">
+                  <option value="">Selecciona…</option>
+                </select>
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Desde</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-hi-ini" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Hasta</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-hi-fin" class="rep-filter-input" />
+              </span>
+            </div>
+            <button type="button" id="rep-hi-buscar" class="btn-primary rep-generate-btn">Generar reporte</button>
+          </div>
+
+          <div id="rep-hi-summary" class="rep-summary hidden"></div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table reg-log">
+                <thead>
+                  <tr>
+                    <th style="width: 18%;">Fecha y hora</th>
+                    <th style="width: 12%;">Tipo</th>
+                    <th>Motivo</th>
+                    <th style="width: 16%;">Registró</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-hi-tbody">
+                  <tr class="users-empty-row"><td colspan="4">Selecciona empleado y rango, presiona Generar.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reporte: Salidas por motivo -->
+        <section class="view" data-view="rep-salidas-motivo">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Salidas por motivo</h2>
+              <p class="users-sub">Conteo de salidas agrupadas por tipo de motivo.</p>
+            </div>
+            <div class="rep-toolbar-actions">
+              <button type="button" id="rep-sm-xlsx" class="rep-export-btn" disabled>
+                <span id="rep-sm-xlsx-icon"></span>
+                <span>Excel</span>
+              </button>
+              <button type="button" id="rep-sm-pdf" class="rep-export-btn" disabled>
+                <span id="rep-sm-pdf-icon"></span>
+                <span>PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="rep-filter-bar">
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Desde</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-sm-ini" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Hasta</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-sm-fin" class="rep-filter-input" />
+              </span>
+            </div>
+            <button type="button" id="rep-sm-buscar" class="btn-primary rep-generate-btn">Generar reporte</button>
+          </div>
+
+          <div id="rep-sm-summary" class="rep-summary hidden"></div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Motivo</th>
+                    <th style="width: 30%;">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-sm-tbody">
+                  <tr class="users-empty-row"><td colspan="2">Selecciona rango y presiona Generar.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Auditoría view -->
+        <section class="view" data-view="auditoria">
+          <div class="window placeholder-card">
+            <div class="placeholder-icon" id="ph-icon-auditoria"></div>
+            <h2>Auditoría</h2>
+            <p>Bitácora de acciones: quién hizo qué y cuándo. Útil para investigar incidencias y auditorías internas.</p>
+          </div>
+        </section>
+
+        <!-- Apariencia view -->
+        <section class="view" data-view="apariencia">
+          <div style="margin-bottom: 4px;">
+            <h2 style="font-size: 20px; font-weight: 600; letter-spacing: -0.2px; margin: 0 0 4px;">Apariencia</h2>
+            <p style="color: var(--muted); font-size: 13.5px; margin: 0 0 16px;">Personaliza el tema y el color de acento de la aplicación.</p>
+          </div>
+
+          <div class="settings-card" style="margin-bottom: 14px;">
+            <div class="settings-section-title">Tema</div>
+            <div class="flex gap-2" id="theme-pills"></div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-section-title">Acento</div>
+            <div class="flex gap-2.5 items-center" id="accent-swatches"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- User create/edit modal -->
+  <div id="user-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="user-modal-title">Nuevo usuario</h2>
+        <button type="button" class="modal-close-btn" data-modal-close aria-label="Cerrar">
+          <span id="icon-modal-close"></span>
+        </button>
+      </header>
+      <form id="user-form" class="modal-body" novalidate>
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="field">
+            <span class="field-label">Nombre</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="um-nombre" autocomplete="given-name" />
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-label">Apellidos</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="um-apellidos" autocomplete="family-name" />
+            </span>
+          </label>
+        </div>
+        <label class="field">
+          <span class="field-label">Usuario</span>
+          <span class="field-shell">
+            <input class="field-input" type="text" id="um-username" autocomplete="username" spellcheck="false" />
+          </span>
+          <span class="field-hint" id="um-username-hint">Mínimo 2 caracteres. Letras, números, punto, guion.</span>
+        </label>
+        <label class="field">
+          <span class="field-label" id="um-password-label">Contraseña</span>
+          <span class="field-shell">
+            <input class="field-input" type="password" id="um-password" autocomplete="new-password" placeholder="••••••••" />
+          </span>
+          <span class="field-hint" id="um-password-hint">Debe cumplir los criterios siguientes.</span>
+          <ul id="um-pw-rules" class="pw-rules hidden"></ul>
+        </label>
+        <label class="field" id="um-password2-field">
+          <span class="field-label" id="um-password2-label">Confirmar contraseña</span>
+          <span class="field-shell" id="um-password2-shell">
+            <input class="field-input" type="password" id="um-password2" autocomplete="new-password" placeholder="••••••••" />
+          </span>
+          <span class="field-error hidden" id="um-password2-error"></span>
+        </label>
+        <div id="um-perms-note" class="field-hint flex gap-2 items-start hidden">
+          <span class="mt-px" id="um-perms-note-icon"></span>
+          <span>Los usuarios nuevos no tienen acceso a ningún módulo. Asígnale permisos desde <b>Accesos</b> después de crearlo.</span>
+        </div>
+        <div id="um-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-modal-close>Cancelar</button>
+        <button type="submit" form="user-form" id="um-submit" class="btn-primary btn-primary--auto">Guardar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Empleado create/edit modal -->
+  <div id="empleado-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="empleado-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="empleado-modal-title">Nuevo empleado</h2>
+        <button type="button" class="modal-close-btn" data-empmodal-close aria-label="Cerrar">
+          <span id="icon-empmodal-close"></span>
+        </button>
+      </header>
+      <form id="empleado-form" class="modal-body" novalidate>
+        <label class="field" id="em-numero-field">
+          <span class="field-label">Número de empleado</span>
+          <span class="field-shell">
+            <input class="field-input" type="text" id="em-numero" autocomplete="off" spellcheck="false" />
+          </span>
+          <span class="field-hint">Identificador único. Letras, números, punto, guion.</span>
+        </label>
+        <div id="em-auto-numero" class="field-hint hidden" style="margin: -4px 0 0;">
+          Se asignará automáticamente al guardar.
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="field">
+            <span class="field-label">Nombre</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="em-nombre" autocomplete="given-name" />
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-label">Apellidos</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="em-apellidos" autocomplete="family-name" />
+            </span>
+          </label>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="field">
+            <span class="field-label">Puesto</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="em-puesto" autocomplete="organization-title" />
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-label">Departamento</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="em-departamento" autocomplete="off" />
+            </span>
+          </label>
+        </div>
+        <div id="em-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-empmodal-close>Cancelar</button>
+        <button type="submit" form="empleado-form" id="em-submit" class="btn-primary btn-primary--auto">Guardar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Tipo de salida create/edit modal -->
+  <div id="tipo-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tipo-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="tipo-modal-title">Nuevo motivo</h2>
+        <button type="button" class="modal-close-btn" data-tipomodal-close aria-label="Cerrar">
+          <span id="icon-tipomodal-close"></span>
+        </button>
+      </header>
+      <form id="tipo-form" class="modal-body" novalidate>
+        <label class="field">
+          <span class="field-label">Nombre del motivo</span>
+          <span class="field-shell">
+            <input class="field-input" type="text" id="tipo-valor" autocomplete="off" maxlength="64" />
+          </span>
+          <span class="field-hint">Máximo 64 caracteres.</span>
+        </label>
+        <div id="tipo-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-tipomodal-close>Cancelar</button>
+        <button type="submit" form="tipo-form" id="tipo-submit" class="btn-primary btn-primary--auto">Guardar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Editar registro modal -->
+  <div id="evt-edit-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="evt-edit-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="evt-edit-modal-title">Editar registro</h2>
+        <button type="button" class="modal-close-btn" data-evtmodal-close aria-label="Cerrar">
+          <span id="icon-evtmodal-close"></span>
+        </button>
+      </header>
+      <form id="evt-edit-form" class="modal-body" novalidate>
+        <div class="field-hint" id="evt-edit-empleado" style="margin-bottom: 4px;">—</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="field">
+            <span class="field-label">Tipo</span>
+            <span class="field-shell select-shell">
+              <select id="evt-edit-tipo" class="field-input field-select">
+                <option value="entrada">Entrada</option>
+                <option value="salida">Salida</option>
+              </select>
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-label">Fecha y hora</span>
+            <span class="field-shell">
+              <input type="datetime-local" id="evt-edit-ts" class="field-input" />
+            </span>
+          </label>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="field">
+            <span class="field-label">Motivo <span class="users-muted" id="evt-edit-motivo-req">(opcional)</span></span>
+            <span class="field-shell select-shell">
+              <select id="evt-edit-motivo" class="field-input field-select">
+                <option value="">— sin motivo —</option>
+              </select>
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-label">Detalle <span class="users-muted">(opcional)</span></span>
+            <span class="field-shell">
+              <input type="text" id="evt-edit-detalle" class="field-input" autocomplete="off" />
+            </span>
+          </label>
+        </div>
+        <div class="evt-pw-block">
+          <span class="reg-form-label" style="display:block; margin-bottom: 6px;">Confirma tu contraseña para guardar los cambios</span>
+          <span class="field-shell">
+            <input type="password" id="evt-edit-pw" class="field-input" autocomplete="current-password" placeholder="Tu contraseña actual" />
+          </span>
+        </div>
+        <div id="evt-edit-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-evtmodal-close>Cancelar</button>
+        <button type="submit" form="evt-edit-form" id="evt-edit-submit" class="btn-primary btn-primary--auto">Guardar cambios</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Eliminar registro modal -->
+  <div id="evt-del-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="evt-del-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="evt-del-modal-title">Eliminar registro</h2>
+        <button type="button" class="modal-close-btn" data-delmodal-close aria-label="Cerrar">
+          <span id="icon-delmodal-close"></span>
+        </button>
+      </header>
+      <form id="evt-del-form" class="modal-body" novalidate>
+        <p style="margin: 0 0 4px; color: var(--text); font-size: 14px;">¿Eliminar este registro permanentemente?</p>
+        <div class="evt-del-summary" id="evt-del-summary">—</div>
+        <div class="evt-pw-block">
+          <span class="reg-form-label" style="display:block; margin-bottom: 6px;">Confirma tu contraseña para eliminar</span>
+          <span class="field-shell">
+            <input type="password" id="evt-del-pw" class="field-input" autocomplete="current-password" placeholder="Tu contraseña actual" />
+          </span>
+        </div>
+        <div id="evt-del-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-delmodal-close>Cancelar</button>
+        <button type="submit" form="evt-del-form" id="evt-del-submit" class="btn-primary btn-primary--auto" style="background: var(--error);">Eliminar</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="../shared/icons.js"></script>
+  <script src="../shared/password.js"></script>
+  <script src="../shared/permissions.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

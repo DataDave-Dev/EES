@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:" />
+  <title>Onix · Configuración inicial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../styles/output.css" />
+  <script src="../shared/theme.js"></script>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+  <!-- Stepper -->
+  <div class="wizard-progress">
+    <ol class="step-bar" id="step-bar">
+      <li class="step" data-step="0">
+        <span class="step-dot"></span>
+        <span class="step-label">Bienvenida</span>
+      </li>
+      <li class="step-line"><span class="step-line-fill"></span></li>
+      <li class="step" data-step="1">
+        <span class="step-dot"></span>
+        <span class="step-label">Tu cuenta</span>
+      </li>
+      <li class="step-line"><span class="step-line-fill"></span></li>
+      <li class="step" data-step="2">
+        <span class="step-dot"></span>
+        <span class="step-label">Seguridad</span>
+      </li>
+      <li class="step-line"><span class="step-line-fill"></span></li>
+      <li class="step" data-step="3">
+        <span class="step-dot"></span>
+        <span class="step-label">Listo</span>
+      </li>
+    </ol>
+  </div>
+
+  <!-- Step body -->
+  <form id="setup-form" class="wizard-body" novalidate>
+    <!-- Step 0 — Welcome -->
+    <section class="wizard-step is-active" data-step="0">
+      <div class="welcome-stage">
+        <div class="welcome-mark">O</div>
+        <h1 class="wizard-title-lg">Bienvenida a Onix</h1>
+        <p class="wizard-lede">
+          Es la primera vez que se inicia el sistema. Vamos a crear la cuenta
+          de administrador — son tres pasos rápidos y no toma más de un minuto.
+        </p>
+        <ul class="welcome-list">
+          <li>
+            <span class="welcome-num">1</span>
+            <div>
+              <div class="welcome-item-title">Tu cuenta</div>
+              <div class="welcome-item-sub">Nombre, apellidos y usuario para iniciar sesión.</div>
+            </div>
+          </li>
+          <li>
+            <span class="welcome-num">2</span>
+            <div>
+              <div class="welcome-item-title">Seguridad</div>
+              <div class="welcome-item-sub">Define una contraseña fuerte para proteger el sistema.</div>
+            </div>
+          </li>
+          <li>
+            <span class="welcome-num">3</span>
+            <div>
+              <div class="welcome-item-title">Listo</div>
+              <div class="welcome-item-sub">Inicia sesión y empieza a registrar entradas y salidas.</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Step 1 — Account -->
+    <section class="wizard-step" data-step="1">
+      <header class="wizard-head">
+        <h1 class="wizard-title">Tu cuenta de administrador</h1>
+        <p class="wizard-sub">Cómo te identificarás en el sistema.</p>
+      </header>
+      <div class="flex flex-col gap-3">
+        <div class="grid grid-cols-2 gap-2.5 wizard-name-grid">
+          <label class="field">
+            <span class="field-label">Nombre</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="nombre" placeholder="María" autocomplete="given-name" />
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-label">Apellidos</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="apellidos" placeholder="López García" autocomplete="family-name" />
+            </span>
+          </label>
+        </div>
+        <label class="field">
+          <span class="field-label">Usuario</span>
+          <span class="field-shell">
+            <span class="field-icon" id="icon-user"></span>
+            <input class="field-input" type="text" id="username" placeholder="m.lopez" autocomplete="username" spellcheck="false" />
+          </span>
+          <span class="field-hint">Mínimo 2 caracteres. Lo usarás para iniciar sesión.</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Step 2 — Security -->
+    <section class="wizard-step" data-step="2">
+      <header class="wizard-head">
+        <h1 class="wizard-title">Protege tu cuenta</h1>
+        <p class="wizard-sub">Mínimo 8 caracteres. Mezcla mayúsculas, números y símbolos.</p>
+      </header>
+      <div class="flex flex-col gap-3">
+        <label class="field">
+          <span class="field-label">Contraseña</span>
+          <span class="field-shell" id="pass-shell">
+            <span class="field-icon" id="icon-lock1"></span>
+            <input class="field-input" type="password" id="password" placeholder="••••••••" autocomplete="new-password" />
+            <button type="button" id="eye-btn" class="eye-btn" aria-label="Mostrar contraseña"></button>
+          </span>
+        </label>
+        <div class="strength-bar">
+          <div class="strength-track">
+            <span class="strength-seg" data-i="0"></span>
+            <span class="strength-seg" data-i="1"></span>
+            <span class="strength-seg" data-i="2"></span>
+            <span class="strength-seg" data-i="3"></span>
+          </div>
+          <div class="strength-meta">
+            <span>Fortaleza</span>
+            <span id="strength-label">—</span>
+          </div>
+        </div>
+        <label class="field" id="pass2-field">
+          <span class="field-label" id="pass2-label">Confirmar contraseña</span>
+          <span class="field-shell" id="pass2-shell">
+            <span class="field-icon" id="icon-lock2"></span>
+            <input class="field-input" type="password" id="password2" placeholder="••••••••" autocomplete="new-password" />
+          </span>
+          <span id="pass2-error" class="field-error hidden"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Step 3 — Done -->
+    <section class="wizard-step" data-step="3">
+      <div class="done-stage">
+        <div class="done-check" id="done-check"></div>
+        <h1 class="wizard-title-lg done-title">Todo listo</h1>
+        <p class="wizard-lede done-lede">
+          Se creó la cuenta <b id="done-user">admin</b>.
+          Ahora puedes iniciar sesión y empezar a registrar entradas y salidas.
+        </p>
+      </div>
+    </section>
+
+    <div id="error" class="alert-error hidden wizard-error"></div>
+  </form>
+
+  <!-- Footer -->
+  <div class="wizard-foot">
+    <button type="button" id="back-btn" class="btn-ghost-outline" style="visibility: hidden;">
+      <span>Atrás</span>
+    </button>
+    <button type="button" id="next-btn" class="btn-primary btn-primary--auto">
+      <span id="next-content">Comenzar</span>
+    </button>
+  </div>
+
+  <script src="../shared/icons.js"></script>
+  <script src="../shared/password.js"></script>
+  <script src="setup.js"></script>
+</body>
+</html>

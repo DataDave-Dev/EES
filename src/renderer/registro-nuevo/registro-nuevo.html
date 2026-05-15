@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:" />
+  <title>Onix · Nuevo registro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../styles/output.css" />
+  <script src="../shared/theme.js"></script>
+</head>
+<body class="h-screen overflow-hidden">
+  <div class="regn-page">
+    <header class="regn-header">
+      <button type="button" id="regn-back" class="regn-back-btn" aria-label="Volver">
+        <span id="regn-back-icon"></span>
+        <span>Volver</span>
+      </button>
+      <div class="regn-header-title">
+        <div class="identity-sub" style="color: var(--accent);">Asistencia</div>
+        <h1 class="regn-title">Nuevo registro</h1>
+      </div>
+      <div></div>
+    </header>
+
+    <main class="regn-main">
+      <div class="window regn-card">
+
+        <!-- Fecha y hora -->
+        <div class="reg-section reg-section--clock">
+          <span class="reg-section-label">Fecha y hora</span>
+          <div class="reg-clock-text">
+            <span id="reg-now-time">—:—:—</span>
+            <span id="reg-now-date">—</span>
+          </div>
+        </div>
+
+        <!-- Empleado -->
+        <div class="reg-section">
+          <div class="reg-section-head">
+            <span class="reg-section-label">Empleado</span>
+            <button type="button" id="reg-quick-add" class="reg-section-link" title="Crear empleado nuevo">
+              <span id="reg-quick-add-icon"></span>
+              <span>Nuevo empleado</span>
+            </button>
+          </div>
+          <div class="reg-search-shell">
+            <span class="reg-search-icon" id="reg-search-icon"></span>
+            <input
+              type="text"
+              id="reg-search"
+              class="reg-search-input"
+              placeholder="Buscar por número o nombre…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div id="reg-results" class="reg-results hidden"></div>
+          <div id="reg-selected" class="reg-selected hidden"></div>
+        </div>
+
+        <!-- Motivo (opcional para entrada, requerido para salida) -->
+        <div id="reg-salida-fields" class="reg-section hidden">
+          <div class="reg-section-head">
+            <span class="reg-section-label">Motivo del evento</span>
+            <button type="button" id="reg-tipo-add-btn" class="reg-section-link" title="Crear motivo nuevo">
+              <span id="reg-tipo-add-icon"></span>
+              <span>Nuevo motivo</span>
+            </button>
+          </div>
+          <div class="reg-motivo-grid">
+            <span class="field-shell select-shell">
+              <select id="reg-salida-tipo" class="field-input field-select">
+                <option value="">Selecciona…</option>
+              </select>
+            </span>
+            <span class="field-shell">
+              <input type="text" id="reg-salida-detalle" class="field-input" autocomplete="off" placeholder="Detalle (opcional)" />
+            </span>
+          </div>
+          <span class="field-hint" id="reg-motivo-hint" style="margin-top: 4px;">Opcional para entradas. Obligatorio para salidas.</span>
+        </div>
+
+        <!-- Acciones -->
+        <div class="reg-actions-grid">
+          <button type="button" id="reg-btn-in" class="reg-action-btn reg-action-btn--in" disabled>
+            <span id="reg-icon-in"></span>
+            <span>Entrada</span>
+          </button>
+          <button type="button" id="reg-btn-out" class="reg-action-btn reg-action-btn--out" disabled>
+            <span id="reg-icon-out"></span>
+            <span>Salida</span>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Nuevo motivo modal -->
+  <div id="reg-tipo-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="reg-tipo-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="reg-tipo-modal-title">Nuevo motivo</h2>
+        <button type="button" class="modal-close-btn" data-tipomodal-close aria-label="Cerrar">
+          <span id="icon-tipomodal-close"></span>
+        </button>
+      </header>
+      <form id="reg-tipo-form" class="modal-body" novalidate>
+        <label class="field">
+          <span class="field-label">Nombre del motivo</span>
+          <span class="field-shell">
+            <input type="text" id="reg-tipo-input" class="field-input" maxlength="64" autocomplete="off" placeholder="p. ej. Trámite bancario" />
+          </span>
+          <span class="field-hint">Máximo 64 caracteres.</span>
+        </label>
+        <div id="reg-tipo-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-tipomodal-close>Cancelar</button>
+        <button type="submit" form="reg-tipo-form" id="reg-tipo-save" class="btn-primary btn-primary--auto">Agregar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Quick-add empleado modal -->
+  <div id="empleado-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="empleado-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="empleado-modal-title">Nuevo empleado</h2>
+        <button type="button" class="modal-close-btn" data-empmodal-close aria-label="Cerrar">
+          <span id="icon-empmodal-close"></span>
+        </button>
+      </header>
+      <form id="empleado-form" class="modal-body" novalidate>
+        <div class="field-hint" style="margin-bottom: 4px;">El número se asignará automáticamente al guardar.</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="field">
+            <span class="field-label">Nombre</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="em-nombre" autocomplete="given-name" />
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-label">Apellidos</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="em-apellidos" autocomplete="family-name" />
+            </span>
+          </label>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="field">
+            <span class="field-label">Puesto</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="em-puesto" autocomplete="organization-title" />
+            </span>
+          </label>
+          <label class="field">
+            <span class="field-label">Departamento</span>
+            <span class="field-shell">
+              <input class="field-input" type="text" id="em-departamento" autocomplete="off" />
+            </span>
+          </label>
+        </div>
+        <div id="em-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-empmodal-close>Cancelar</button>
+        <button type="submit" form="empleado-form" id="em-submit" class="btn-primary btn-primary--auto">Guardar</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="../shared/icons.js"></script>
+  <script src="../shared/permissions.js"></script>
+  <script src="registro-nuevo.js"></script>
+</body>
+</html>

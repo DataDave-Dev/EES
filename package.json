@@ -1,0 +1,43 @@
+{
+  "name": "ees",
+  "productName": "Onix",
+  "version": "1.0.0",
+  "description": "My Electron application description",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "start": "npm run build:css && electron-forge start",
+    "build:css": "tailwindcss -i ./src/styles/input.css -o ./src/styles/output.css --minify",
+    "watch:css": "tailwindcss -i ./src/styles/input.css -o ./src/styles/output.css --watch",
+    "rebuild": "electron-rebuild -f -w better-sqlite3,bcrypt",
+    "package": "npm run build:css && electron-forge package",
+    "make": "npm run build:css && electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "echo \"No linting configured\""
+  },
+  "keywords": [],
+  "author": {
+    "name": "David De Leon",
+    "email": "deleonalonso77@gmail.com"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.10.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-rpm": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
+    "@electron-forge/plugin-fuses": "^7.11.1",
+    "@electron/fuses": "^1.8.0",
+    "@electron/rebuild": "^3.7.0",
+    "electron": "33.4.11",
+    "tailwindcss": "^3.4.14"
+  }
+}

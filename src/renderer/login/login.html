@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:" />
+  <title>Onix · Iniciar sesión</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../styles/output.css" />
+  <script src="../shared/theme.js"></script>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+  <!-- Clock band -->
+  <div class="clock-band">
+    <div class="clock-time">
+      <span id="clock-hh">--</span>
+      <span class="clock-sep">:</span>
+      <span id="clock-mm">--</span>
+      <span class="clock-sec">:<span id="clock-ss">--</span></span>
+      <span class="clock-meridiem" id="clock-ampm">--</span>
+    </div>
+    <div id="clock-date" class="clock-date">—</div>
+  </div>
+
+  <!-- Form -->
+  <form id="login-form" class="flex-1 flex flex-col gap-4" style="padding: 22px 36px 26px;" novalidate>
+    <div class="identity">
+      <div class="identity-mark">O</div>
+      <div class="flex flex-col gap-0.5">
+        <div class="identity-title">Onix</div>
+        <div class="identity-sub">Control de Asistencia</div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <label class="field">
+        <span class="field-label">Usuario</span>
+        <span class="field-shell">
+          <span class="field-icon" id="icon-user"></span>
+          <input class="field-input" type="text" id="username" name="username" placeholder="recepcion" autocomplete="username" spellcheck="false" autofocus />
+        </span>
+      </label>
+
+      <label class="field" id="pass-field">
+        <span class="field-label" id="pass-label">Contraseña</span>
+        <span class="field-shell" id="pass-shell">
+          <span class="field-icon" id="icon-lock"></span>
+          <input class="field-input" type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" spellcheck="false" />
+          <button type="button" id="eye-btn" class="eye-btn" aria-label="Mostrar contraseña"></button>
+        </span>
+        <span id="pass-error" class="field-error hidden"></span>
+      </label>
+
+      <div id="caps-hint" class="caps-hint hidden"></div>
+    </div>
+
+    <button type="submit" id="submit-btn" class="btn-primary" disabled>
+      <span id="submit-content">Iniciar sesión</span>
+    </button>
+  </form>
+
+  <script src="../shared/icons.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>
