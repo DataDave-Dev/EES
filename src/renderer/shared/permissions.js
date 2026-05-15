@@ -18,6 +18,8 @@ window.EES_PERMISSIONS = (() => {
     'rep-asistencia-dia': 'reportes',
     'rep-historial': 'reportes',
     'rep-salidas-motivo': 'reportes',
+    'rep-horas-dentro-fuera': 'reportes',
+    'configuracion-general': 'usuarios',
   };
 
   function has(user, perm) {

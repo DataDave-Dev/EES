@@ -116,7 +116,45 @@ function initSchema(database) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_catalogo_items_cat ON catalogo_items(catalogo, estatus, orden);
+
+    -- Global app settings (key/value)
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    -- Auditoría: bitácora de todas las acciones del sistema.
+    -- username es snapshot del momento (para sobrevivir renombres/borrados).
+    -- details guarda un JSON con contexto, before/after, motivo del fallo, etc.
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp     TEXT    NOT NULL DEFAULT (datetime('now')),
+      user_id       INTEGER,
+      username      TEXT    NOT NULL DEFAULT 'anon',
+      action        TEXT    NOT NULL,
+      entity_type   TEXT,
+      entity_id     INTEGER,
+      entity_label  TEXT,
+      details       TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_log_ts     ON audit_log(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_user   ON audit_log(user_id, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action, timestamp);
   `);
+
+  // Seed default work schedule (only if rows missing).
+  // work_days encoded as comma-separated weekday numbers: 1=Mon..7=Sun.
+  const settingDefaults = [
+    ['work_start', '09:00'],
+    ['work_end',   '18:00'],
+    ['work_days',  '1,2,3,4,5'],
+  ];
+  const insSetting = database.prepare(
+    'INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)'
+  );
+  for (const [k, v] of settingDefaults) insSetting.run(k, v);
 
   // Migrate catalog name: 'salida_tipos' → 'motivos'.
   // Defensive against the case where a previous (broken) run seeded 'motivos'

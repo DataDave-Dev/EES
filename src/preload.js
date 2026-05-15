@@ -36,7 +36,18 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('registro:deleteEvent', { id, password }),
 
   // Dashboard
-  getDashboardStats: () => ipcRenderer.invoke('dashboard:stats'),
+  getDashboardStats: (range) => ipcRenderer.invoke('dashboard:stats', { range }),
+
+  // Configuración general
+  getWorkSchedule: () => ipcRenderer.invoke('configuracion:getWorkSchedule'),
+  setWorkSchedule: (payload) => ipcRenderer.invoke('configuracion:setWorkSchedule', payload),
+  getCompanyName: () => ipcRenderer.invoke('configuracion:getCompanyName'),
+  setCompanyName: (name) => ipcRenderer.invoke('configuracion:setCompanyName', { name }),
+
+  // Auditoría
+  auditList: (opts) => ipcRenderer.invoke('audit:list', opts || {}),
+  auditListActions: () => ipcRenderer.invoke('audit:listActions'),
+  auditListUsers: () => ipcRenderer.invoke('audit:listUsers'),
 
   // Reportes
   reporteAsistenciaDia: (fecha) =>
@@ -45,6 +56,10 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('reportes:historial', { empleadoId, ini, fin }),
   reporteSalidasMotivo: (ini, fin) =>
     ipcRenderer.invoke('reportes:salidasMotivo', { ini, fin }),
+  reporteHorasDentroFuera: (ini, fin) =>
+    ipcRenderer.invoke('reportes:horasDentroFuera', { ini, fin }),
+  reporteHorasDentroFueraEmpleado: (empleadoId, ini, fin) =>
+    ipcRenderer.invoke('reportes:horasDentroFueraEmpleado', { empleadoId, ini, fin }),
   reporteListEmpleados: () => ipcRenderer.invoke('reportes:listEmpleados'),
   exportReporteExcel: (payload) => ipcRenderer.invoke('reportes:exportExcel', payload),
   exportReportePdf: (payload) => ipcRenderer.invoke('reportes:exportPdf', payload),

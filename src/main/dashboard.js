@@ -1,9 +1,30 @@
 const { getDb } = require('./db');
 
-function getStats() {
-  const db = getDb();
+const RANGES = {
+  today: { days: 1, label: 'Hoy' },
+  '7d':   { days: 7, label: 'Últimos 7 días' },
+  '30d':  { days: 30, label: 'Últimos 30 días' },
+};
 
-  // ── KPIs ──────────────────────────────────────────────
+function normalizeRange(range) {
+  return RANGES[range] ? range : 'today';
+}
+
+// Returns 'YYYY-MM-DD' local string for "today - n days"
+function isoDateOffset(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getStats(rangeRaw) {
+  const db = getDb();
+  const range = normalizeRange(rangeRaw);
+  const days = RANGES[range].days;
+  const finIso = isoDateOffset(0);
+  const iniIso = isoDateOffset(-(days - 1));
+
+  // ── KPIs (always today) ──────────────────────────────
   const empleadosActivos = db
     .prepare("SELECT COUNT(*) AS c FROM empleados WHERE estatus = 'activo'")
     .get().c;
@@ -31,8 +52,7 @@ function getStats() {
     `)
     .get().c;
 
-  // ── Empleados presentes ahora ────────────────────────
-  // Para cada empleado, busca su último evento de HOY; si es 'entrada' → está aquí.
+  // ── Empleados presentes ahora (siempre hoy) ──────────
   const presentes = db
     .prepare(`
       WITH last_today AS (
@@ -59,7 +79,7 @@ function getStats() {
     `)
     .all();
 
-  // ── Actividad reciente (últimos 8 eventos del día) ───
+  // ── Actividad reciente (siempre últimos 8 eventos hoy) ───
   const actividad = db
     .prepare(`
       SELECT
@@ -73,42 +93,93 @@ function getStats() {
     `)
     .all();
 
-  // ── Salidas por motivo, últimos 7 días ───────────────
-  const motivos7d = db
+  // ── Salidas por motivo (según rango) ─────────────────
+  const motivos = db
     .prepare(`
       SELECT
         COALESCE(motivo_tipo, '(sin motivo)') AS motivo,
         COUNT(*) AS total
       FROM registro_eventos
       WHERE tipo = 'salida'
-        AND date(timestamp, 'localtime') >= date('now', 'localtime', '-6 days')
+        AND date(timestamp, 'localtime') BETWEEN ? AND ?
       GROUP BY motivo
       ORDER BY total DESC
       LIMIT 8
     `)
-    .all();
+    .all(iniIso, finIso);
 
-  // ── Actividad por hora (hoy) ─────────────────────────
-  // Devuelve 24 buckets (0..23) con conteo de entradas y salidas.
-  const horasRows = db
-    .prepare(`
-      SELECT
-        CAST(strftime('%H', timestamp, 'localtime') AS INTEGER) AS hora,
-        tipo,
-        COUNT(*) AS total
-      FROM registro_eventos
-      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-      GROUP BY hora, tipo
-    `)
-    .all();
-  const horas = Array.from({ length: 24 }, (_, h) => ({ hora: h, entradas: 0, salidas: 0 }));
-  for (const r of horasRows) {
-    if (r.hora < 0 || r.hora > 23) continue;
-    if (r.tipo === 'entrada') horas[r.hora].entradas = r.total;
-    else if (r.tipo === 'salida') horas[r.hora].salidas = r.total;
+  // ── Actividad: buckets según rango ───────────────────
+  // - 'today': 24 horas
+  // - '7d' / '30d': N días
+  let actividadSerie;
+  if (range === 'today') {
+    const horasRows = db
+      .prepare(`
+        SELECT
+          CAST(strftime('%H', timestamp, 'localtime') AS INTEGER) AS bucket,
+          tipo,
+          COUNT(*) AS total
+        FROM registro_eventos
+        WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+        GROUP BY bucket, tipo
+      `)
+      .all();
+    const buckets = Array.from({ length: 24 }, (_, h) => ({
+      key: String(h).padStart(2, '0'),
+      label: `${String(h).padStart(2, '0')}:00`,
+      shortLabel: h % 3 === 0 ? `${String(h).padStart(2, '0')}h` : '',
+      entradas: 0,
+      salidas: 0,
+    }));
+    for (const r of horasRows) {
+      if (r.bucket < 0 || r.bucket > 23) continue;
+      if (r.tipo === 'entrada') buckets[r.bucket].entradas = r.total;
+      else if (r.tipo === 'salida') buckets[r.bucket].salidas = r.total;
+    }
+    actividadSerie = { kind: 'hourly', buckets };
+  } else {
+    const diasRows = db
+      .prepare(`
+        SELECT
+          date(timestamp, 'localtime') AS bucket,
+          tipo,
+          COUNT(*) AS total
+        FROM registro_eventos
+        WHERE date(timestamp, 'localtime') BETWEEN ? AND ?
+        GROUP BY bucket, tipo
+      `)
+      .all(iniIso, finIso);
+
+    const buckets = [];
+    for (let i = 0; i < days; i++) {
+      const d = isoDateOffset(-(days - 1 - i));
+      const dt = new Date(d + 'T00:00:00');
+      const dayShort = dt.toLocaleDateString('es-MX', { weekday: 'short' });
+      const dayNum = dt.getDate();
+      const monthShort = dt.toLocaleDateString('es-MX', { month: 'short' });
+      buckets.push({
+        key: d,
+        label: dt.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }),
+        shortLabel: days <= 7 ? `${dayShort.replace('.', '')} ${dayNum}` : (i % Math.ceil(days / 8) === 0 ? `${dayNum} ${monthShort.replace('.', '')}` : ''),
+        entradas: 0,
+        salidas: 0,
+      });
+    }
+    const byKey = new Map(buckets.map((b) => [b.key, b]));
+    for (const r of diasRows) {
+      const b = byKey.get(r.bucket);
+      if (!b) continue;
+      if (r.tipo === 'entrada') b.entradas = r.total;
+      else if (r.tipo === 'salida') b.salidas = r.total;
+    }
+    actividadSerie = { kind: 'daily', buckets };
   }
 
   return {
+    range,
+    rangeLabel: RANGES[range].label,
+    rangeIni: iniIso,
+    rangeFin: finIso,
     kpis: {
       empleadosActivos,
       eventosHoy,
@@ -118,8 +189,8 @@ function getStats() {
     },
     presentes,
     actividad,
-    motivos7d,
-    horas,
+    motivos,
+    actividadSerie,
   };
 }
 

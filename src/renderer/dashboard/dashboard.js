@@ -18,7 +18,6 @@ document.getElementById('nav-icon-usuarios').innerHTML = I.user(15);
 document.getElementById('nav-icon-accesos').innerHTML = I.shield(15);
 document.getElementById('nav-icon-auditoria').innerHTML = I.clipboard(15);
 document.getElementById('nav-icon-apariencia').innerHTML = I.palette(15);
-document.getElementById('ph-icon-auditoria').innerHTML = I.clipboard(28);
 
 let currentUser = null;
 
@@ -73,12 +72,27 @@ const dashKpiSalidas = document.getElementById('dash-kpi-salidas');
 const dashKpiTotal = document.getElementById('dash-kpi-total');
 const dashActividad = document.getElementById('dash-actividad');
 const dashMotivos = document.getElementById('dash-motivos');
+const dashMotivosSub = document.getElementById('dash-motivos-sub');
 const dashPresentes = document.getElementById('dash-presentes');
 const dashPresentesCount = document.getElementById('dash-presentes-count');
 const dashHourly = document.getElementById('dash-hourly');
 const dashHourlyLegend = document.getElementById('dash-hourly-legend');
+const dashHourlyTitle = document.getElementById('dash-hourly-title');
+const dashHourlySub = document.getElementById('dash-hourly-sub');
+const dashRange = document.getElementById('dash-range');
 
 let dashRefreshInterval = null;
+const dashState = {
+  range: 'today',
+  hiddenSeries: new Set(),
+  lastStats: null,
+};
+
+const RANGE_TITLES = {
+  today: { title: 'Actividad por hora', sub: 'entradas y salidas registradas hoy', motSub: 'salidas de hoy' },
+  '7d':  { title: 'Actividad diaria',   sub: 'entradas y salidas, últimos 7 días', motSub: 'últimos 7 días' },
+  '30d': { title: 'Actividad diaria',   sub: 'entradas y salidas, últimos 30 días', motSub: 'últimos 30 días' },
+};
 
 function dashFmtTime(iso) {
   if (!iso) return '—';
@@ -102,48 +116,81 @@ const CHART_PALETTE = [
 ];
 function chartColor(i) { return CHART_PALETTE[i % CHART_PALETTE.length]; }
 
-// items: [{ label, value, color? }]
-// opts: { size = 180, thickness = 18, centerTop, centerBottom }
+function polarToCartesian(cx, cy, r, angleDeg) {
+  const a = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+}
+function donutArcPath(cx, cy, rOuter, rInner, startAngle, endAngle) {
+  // Close-to-full ring: SVG arcs can't represent 360°, split into two halves.
+  if (endAngle - startAngle >= 359.999) {
+    const half = startAngle + 180;
+    return donutArcPath(cx, cy, rOuter, rInner, startAngle, half) + ' ' +
+           donutArcPath(cx, cy, rOuter, rInner, half, endAngle);
+  }
+  const startOuter = polarToCartesian(cx, cy, rOuter, endAngle);
+  const endOuter   = polarToCartesian(cx, cy, rOuter, startAngle);
+  const startInner = polarToCartesian(cx, cy, rInner, endAngle);
+  const endInner   = polarToCartesian(cx, cy, rInner, startAngle);
+  const largeArc   = endAngle - startAngle > 180 ? 1 : 0;
+  return [
+    'M', startOuter.x.toFixed(2), startOuter.y.toFixed(2),
+    'A', rOuter, rOuter, 0, largeArc, 0, endOuter.x.toFixed(2), endOuter.y.toFixed(2),
+    'L', endInner.x.toFixed(2), endInner.y.toFixed(2),
+    'A', rInner, rInner, 0, largeArc, 1, startInner.x.toFixed(2), startInner.y.toFixed(2),
+    'Z',
+  ].join(' ');
+}
+
+// items: [{ label, value, color?, key? }]
+// opts: { size = 180, thickness = 18, centerTop, centerBottom, interactive: bool, dataAttr: string }
 function donutSVG(items, opts = {}) {
   const size = opts.size || 180;
   const thickness = opts.thickness || 18;
   const cx = size / 2, cy = size / 2;
-  const r = (size - thickness) / 2;
-  const C = 2 * Math.PI * r;
+  const rOuter = size / 2 - 1;
+  const rInner = rOuter - thickness;
   const total = items.reduce((s, it) => s + (it.value || 0), 0);
-  const segs = [];
+
+  // Background ring
+  const bgPath = donutArcPath(cx, cy, rOuter, rInner, 0, 360);
+  let segs = `<path d="${bgPath}" fill="var(--surface-2-strong, rgba(148,163,184,0.18))" />`;
+
   if (total > 0) {
-    let acc = 0;
+    let accDeg = 0;
     items.forEach((it, i) => {
       const v = Math.max(0, it.value || 0);
       if (v <= 0) return;
-      const len = (v / total) * C;
+      const sweep = (v / total) * 360;
+      const start = accDeg;
+      const end = accDeg + sweep;
       const color = it.color || chartColor(i);
-      segs.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
-        stroke="${color}" stroke-width="${thickness}"
-        stroke-dasharray="${len} ${C - len}"
-        stroke-dashoffset="${-acc}"
-        transform="rotate(-90 ${cx} ${cy})" />`);
-      acc += len;
+      const cls = opts.interactive ? 'donut-seg donut-seg--interactive' : 'donut-seg';
+      const dataAttrs = opts.interactive
+        ? ` data-key="${escapeHtml(it.key ?? it.label ?? String(i))}" data-index="${i}" tabindex="0" role="button" aria-label="${escapeHtml(it.label)}: ${v}"`
+        : '';
+      segs += `<path class="${cls}" d="${donutArcPath(cx, cy, rOuter, rInner, start, end)}" fill="${color}"${dataAttrs} />`;
+      accDeg = end;
     });
   }
+
   const ct = opts.centerTop ? `<text x="${cx}" y="${cy - 2}" text-anchor="middle" class="donut-center-top">${escapeHtml(opts.centerTop)}</text>` : '';
   const cb = opts.centerBottom ? `<text x="${cx}" y="${cy + 18}" text-anchor="middle" class="donut-center-bot">${escapeHtml(opts.centerBottom)}</text>` : '';
-  return `<svg class="donut-svg" viewBox="0 0 ${size} ${size}" role="img" aria-hidden="true">
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface-2-strong, rgba(148,163,184,0.18))" stroke-width="${thickness}" />
-    ${segs.join('')}
+  return `<svg class="donut-svg" viewBox="0 0 ${size} ${size}" role="img" aria-hidden="false">
+    ${segs}
     ${ct}${cb}
   </svg>`;
 }
 
 // items: [{ label, value, color }]
-function donutLegend(items, total) {
+function donutLegend(items, total, clickable) {
   if (!items.length) return '';
   const t = total || items.reduce((s, it) => s + (it.value || 0), 0) || 1;
+  const liClass = clickable ? 'donut-legend-item donut-legend-item--clickable' : 'donut-legend-item';
+  const liExtra = clickable ? ' role="button" tabindex="0"' : '';
   return `<ul class="donut-legend">${items.map((it, i) => {
     const color = it.color || chartColor(i);
     const pct = Math.round(((it.value || 0) / t) * 100);
-    return `<li class="donut-legend-item">
+    return `<li class="${liClass}" data-index="${i}"${liExtra}>
       <span class="donut-legend-dot" style="background:${color}"></span>
       <span class="donut-legend-label">${escapeHtml(it.label)}</span>
       <span class="donut-legend-value">${it.value}</span>
@@ -153,18 +200,21 @@ function donutLegend(items, total) {
 }
 
 // series: [{ label, color, points: number[] }]
-// opts: { xLabels: string[] }
+// opts: { xLabels: string[], hidden?: Set<number> }
 function lineSVG(series, opts = {}) {
   const w = 720, h = 200;
   const padL = 36, padR = 12, padT = 10, padB = 28;
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
   const n = series[0]?.points?.length || 1;
+  const hidden = opts.hidden || new Set();
 
   let yMax = 0;
-  series.forEach((s) => s.points.forEach((v) => { if (v > yMax) yMax = v; }));
+  series.forEach((s, idx) => {
+    if (hidden.has(idx)) return;
+    s.points.forEach((v) => { if (v > yMax) yMax = v; });
+  });
   yMax = Math.max(4, Math.ceil(yMax * 1.2));
-  // Round yMax up to a nice number
   const niceStep = yMax <= 8 ? 1 : yMax <= 20 ? 2 : yMax <= 50 ? 5 : 10;
   yMax = Math.ceil(yMax / niceStep) * niceStep;
 
@@ -176,42 +226,97 @@ function lineSVG(series, opts = {}) {
   for (let i = 0; i <= ySteps; i++) {
     const yy = padT + (plotH * i) / ySteps;
     const label = Math.round(yMax * (1 - i / ySteps));
-    grid += `<line x1="${padL}" y1="${yy}" x2="${w - padR}" y2="${yy}" class="chart-grid" />`;
-    grid += `<text x="${padL - 8}" y="${yy + 4}" text-anchor="end" class="chart-axis">${label}</text>`;
+    grid += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${w - padR}" y2="${yy.toFixed(1)}" class="chart-grid" />`;
+    grid += `<text x="${padL - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end" class="chart-axis">${label}</text>`;
   }
 
   let xLabels = '';
   if (opts.xLabels?.length) {
     opts.xLabels.forEach((lab, i) => {
-      if (lab) xLabels += `<text x="${x(i)}" y="${h - 8}" text-anchor="middle" class="chart-axis">${escapeHtml(lab)}</text>`;
+      if (lab) xLabels += `<text x="${x(i).toFixed(1)}" y="${h - 8}" text-anchor="middle" class="chart-axis">${escapeHtml(lab)}</text>`;
     });
   }
 
   let paths = '';
-  series.forEach((s) => {
+  let dots = '';
+  series.forEach((s, idx) => {
+    if (hidden.has(idx)) return;
     const pts = s.points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
     if (pts.length < 2) return;
     const linePath = `M ${pts.join(' L ')}`;
-    const areaPath = `M ${padL},${y(0)} L ${pts.join(' L ')} L ${x(n - 1)},${y(0)} Z`;
+    const areaPath = `M ${padL},${y(0).toFixed(1)} L ${pts.join(' L ')} L ${x(n - 1).toFixed(1)},${y(0).toFixed(1)} Z`;
     paths += `<path d="${areaPath}" fill="${s.color}" opacity="0.12" />`;
     paths += `<path d="${linePath}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
+    s.points.forEach((v, i) => {
+      dots += `<circle class="line-dot" data-series="${idx}" data-index="${i}" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" fill="${s.color}" />`;
+    });
   });
 
-  return `<svg class="line-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-hidden="true">
+  // Hover indicator line (vertical, hidden by default)
+  const hoverLine = `<line class="line-hover-cursor" x1="0" y1="${padT}" x2="0" y2="${padT + plotH}" />`;
+
+  // Hover bands per bucket — drawn last so they sit on top and capture pointer events
+  let bands = '';
+  const bandW = n > 1 ? plotW / (n - 1) : plotW;
+  for (let i = 0; i < n; i++) {
+    const center = x(i);
+    const bx = Math.max(padL, center - bandW / 2);
+    const bw = Math.min(w - padR - bx, bandW);
+    bands += `<rect class="line-band" x="${bx.toFixed(1)}" y="${padT}" width="${bw.toFixed(1)}" height="${plotH}" data-index="${i}" />`;
+  }
+
+  return `<svg class="line-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-hidden="false">
     ${grid}
     ${paths}
+    ${dots}
+    ${hoverLine}
     ${xLabels}
+    ${bands}
   </svg>`;
 }
 
-function chartLegendInline(series) {
-  return `<ul class="chart-legend-inline">${series.map((s) => `
-    <li><span class="chart-legend-dot" style="background:${s.color}"></span>${escapeHtml(s.label)}</li>
-  `).join('')}</ul>`;
+function chartLegendInline(series, hidden) {
+  const h = hidden || new Set();
+  return `<div class="chart-legend-inline">${series.map((s, i) => `
+    <button type="button" class="chart-legend-pill ${h.has(i) ? 'is-hidden' : ''}" data-index="${i}" title="Click para ocultar/mostrar">
+      <span class="chart-legend-dot" style="background:${s.color}"></span>
+      <span>${escapeHtml(s.label)}</span>
+    </button>
+  `).join('')}</div>`;
+}
+
+// ── Tooltip (singleton) ───────────────────────────────────────
+function ensureChartTooltip() {
+  let el = document.getElementById('chart-tooltip');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'chart-tooltip';
+    el.className = 'chart-tooltip hidden';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function showChartTooltip(html, clientX, clientY) {
+  const el = ensureChartTooltip();
+  if (typeof html === 'string') el.innerHTML = html;
+  el.classList.remove('hidden');
+  const rect = el.getBoundingClientRect();
+  const margin = 12;
+  let left = clientX + 14;
+  let top = clientY - rect.height - 12;
+  if (left + rect.width > window.innerWidth - margin) left = clientX - rect.width - 14;
+  if (top < margin) top = clientY + 16;
+  el.style.left = `${Math.round(left)}px`;
+  el.style.top = `${Math.round(top)}px`;
+}
+function hideChartTooltip() {
+  const el = document.getElementById('chart-tooltip');
+  if (el) el.classList.add('hidden');
 }
 
 function renderDashboard(stats) {
-  const { kpis, actividad, motivos7d, presentes, horas } = stats;
+  dashState.lastStats = stats;
+  const { kpis, actividad, motivos, presentes, actividadSerie } = stats;
 
   dashKpiActivos.textContent = kpis.empleadosActivos;
   dashKpiPresentes.textContent = `${kpis.presentes} presentes ahora`;
@@ -219,25 +324,16 @@ function renderDashboard(stats) {
   dashKpiSalidas.textContent = kpis.salidasHoy;
   dashKpiTotal.textContent = kpis.eventosHoy;
 
-  // Actividad por hora (line chart)
-  const hourSeries = [
-    { label: 'Entradas', color: 'var(--success)', resolvedColor: '#2ea66c', points: (horas || []).map((h) => h.entradas) },
-    { label: 'Salidas',  color: 'var(--error)',   resolvedColor: '#e5484d', points: (horas || []).map((h) => h.salidas) },
-  ];
-  const totalHoras = hourSeries.reduce((s, ser) => s + ser.points.reduce((a, b) => a + b, 0), 0);
-  if (!horas || totalHoras === 0) {
-    dashHourly.innerHTML = '<div class="dash-hourly-empty">Sin eventos hoy.</div>';
-    dashHourlyLegend.innerHTML = '';
-  } else {
-    const xLabels = Array.from({ length: 24 }, (_, h) =>
-      h % 3 === 0 ? `${h.toString().padStart(2, '0')}h` : ''
-    );
-    const seriesForSvg = hourSeries.map((s) => ({ label: s.label, color: s.resolvedColor, points: s.points }));
-    dashHourly.innerHTML = lineSVG(seriesForSvg, { xLabels });
-    dashHourlyLegend.innerHTML = chartLegendInline(seriesForSvg);
-  }
+  // Update titles based on range
+  const t = RANGE_TITLES[stats.range] || RANGE_TITLES.today;
+  dashHourlyTitle.textContent = t.title;
+  dashHourlySub.textContent = t.sub;
+  dashMotivosSub.textContent = t.motSub;
 
-  // Actividad
+  renderActivityChart();
+  renderMotivos();
+
+  // Actividad reciente (siempre hoy)
   if (!actividad.length) {
     dashActividad.innerHTML = '<li class="dash-activity-empty">Sin actividad hoy.</li>';
   } else {
@@ -246,36 +342,18 @@ function renderDashboard(stats) {
       const badge = isIn
         ? '<span class="reg-tipo-badge reg-tipo-badge--in">Entrada</span>'
         : '<span class="reg-tipo-badge reg-tipo-badge--out">Salida</span>';
-      const motivo = ev.motivo_tipo ? ` · ${escapeHtml(ev.motivo_tipo)}` : '';
+      const motivoStr = ev.motivo_tipo ? ` · ${escapeHtml(ev.motivo_tipo)}` : '';
       return `
         <li class="dash-activity-item">
           <span class="dash-activity-time">${dashFmtTime(ev.timestamp)}</span>
           <div class="dash-activity-body">
             <span class="dash-activity-name">${escapeHtml(ev.emp_nombre)} ${escapeHtml(ev.emp_apellidos)}</span>
-            <span class="dash-activity-meta">#${escapeHtml(ev.numero_empleado)}${motivo}</span>
+            <span class="dash-activity-meta">#${escapeHtml(ev.numero_empleado)}${motivoStr}</span>
           </div>
           ${badge}
         </li>
       `;
     }).join('');
-  }
-
-  // Salidas por motivo (donut + legend)
-  if (!motivos7d.length) {
-    dashMotivos.innerHTML = '<div class="dash-motivos-empty">Sin salidas en los últimos 7 días.</div>';
-  } else {
-    const totalMot = motivos7d.reduce((s, m) => s + m.total, 0);
-    const items = motivos7d.map((m, i) => ({
-      label: m.motivo,
-      value: m.total,
-      color: chartColor(i),
-    }));
-    dashMotivos.innerHTML = `
-      <div class="donut-wrap donut-wrap--compact">
-        ${donutSVG(items, { size: 160, thickness: 18, centerTop: String(totalMot), centerBottom: 'salidas' })}
-        ${donutLegend(items, totalMot)}
-      </div>
-    `;
   }
 
   // Presentes
@@ -284,19 +362,198 @@ function renderDashboard(stats) {
     dashPresentes.innerHTML = '<div class="dash-presentes-empty">Nadie ha registrado entrada hoy.</div>';
   } else {
     dashPresentes.innerHTML = presentes.map((p) => `
-      <div class="dash-presente-card">
+      <button type="button" class="dash-presente-card dash-presente-card--clickable" data-empleado-id="${p.empleado_id}" title="Ver historial de ${escapeHtml(p.nombre)} ${escapeHtml(p.apellidos)}">
         <span class="dash-presente-dot"></span>
         <div class="dash-presente-info">
           <span class="dash-presente-name">${escapeHtml(p.nombre)} ${escapeHtml(p.apellidos)}</span>
           <span class="dash-presente-meta">#${escapeHtml(p.numero_empleado)} · entró ${dashFmtTime(p.ultimo_ts)}</span>
         </div>
-      </div>
+      </button>
     `).join('');
+    dashPresentes.querySelectorAll('[data-empleado-id]').forEach((btn) => {
+      btn.addEventListener('click', () => navigateToHistorial(+btn.dataset.empleadoId));
+    });
+  }
+}
+
+// ── Render: actividad chart (line) ────────────────────────────
+function renderActivityChart() {
+  const stats = dashState.lastStats;
+  if (!stats) return;
+  const serie = stats.actividadSerie;
+  const buckets = serie?.buckets || [];
+  const seriesForSvg = [
+    { label: 'Entradas', color: '#2ea66c', points: buckets.map((b) => b.entradas) },
+    { label: 'Salidas',  color: '#e5484d', points: buckets.map((b) => b.salidas) },
+  ];
+  const total = seriesForSvg.reduce((s, ser) => s + ser.points.reduce((a, b) => a + b, 0), 0);
+  if (total === 0) {
+    dashHourly.innerHTML = '<div class="dash-hourly-empty">Sin eventos en este rango.</div>';
+    dashHourlyLegend.innerHTML = '';
+    return;
+  }
+  const xLabels = buckets.map((b) => b.shortLabel || '');
+  dashHourly.innerHTML = lineSVG(seriesForSvg, { xLabels, hidden: dashState.hiddenSeries });
+  dashHourlyLegend.innerHTML = chartLegendInline(seriesForSvg, dashState.hiddenSeries);
+
+  // Wire legend toggle
+  dashHourlyLegend.querySelectorAll('.chart-legend-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = +btn.dataset.index;
+      if (dashState.hiddenSeries.has(idx)) {
+        dashState.hiddenSeries.delete(idx);
+      } else {
+        // Prevent hiding all
+        if (dashState.hiddenSeries.size >= seriesForSvg.length - 1) return;
+        dashState.hiddenSeries.add(idx);
+      }
+      renderActivityChart();
+    });
+  });
+
+  // Wire tooltip on hover bands
+  const svg = dashHourly.querySelector('svg');
+  if (!svg) return;
+  const cursor = svg.querySelector('.line-hover-cursor');
+  svg.querySelectorAll('.line-band').forEach((band) => {
+    band.addEventListener('mouseenter', (e) => {
+      const i = +band.dataset.index;
+      const b = buckets[i];
+      if (!b) return;
+      const rows = seriesForSvg.map((s, idx) => {
+        if (dashState.hiddenSeries.has(idx)) return '';
+        return `<div class="ct-row">
+          <span class="ct-dot" style="background:${s.color}"></span>
+          <span class="ct-label">${escapeHtml(s.label)}</span>
+          <span class="ct-value">${s.points[i]}</span>
+        </div>`;
+      }).join('');
+      const totalRow = `<div class="ct-row ct-row--total">
+        <span class="ct-label">Total</span>
+        <span class="ct-value">${b.entradas + b.salidas}</span>
+      </div>`;
+      showChartTooltip(`<div class="ct-title">${escapeHtml(b.label)}</div>${rows}${totalRow}`, e.clientX, e.clientY);
+      if (cursor) {
+        const cx = band.x.baseVal.value + band.width.baseVal.value / 2;
+        cursor.setAttribute('x1', cx);
+        cursor.setAttribute('x2', cx);
+        cursor.classList.add('is-visible');
+      }
+    });
+    band.addEventListener('mousemove', (e) => showChartTooltip(undefined, e.clientX, e.clientY));
+    band.addEventListener('mouseleave', () => {
+      hideChartTooltip();
+      if (cursor) cursor.classList.remove('is-visible');
+    });
+  });
+}
+
+// ── Render: motivos (donut, interactivo) ──────────────────────
+function renderMotivos() {
+  const stats = dashState.lastStats;
+  const motivos = stats?.motivos || [];
+  if (!motivos.length) {
+    dashMotivos.innerHTML = '<div class="dash-motivos-empty">Sin salidas en el rango.</div>';
+    return;
+  }
+  const totalMot = motivos.reduce((s, m) => s + m.total, 0);
+  const items = motivos.map((m, i) => ({
+    label: m.motivo,
+    value: m.total,
+    color: chartColor(i),
+    key: m.motivo,
+  }));
+  dashMotivos.innerHTML = `
+    <div class="donut-wrap donut-wrap--compact">
+      ${donutSVG(items, { size: 160, thickness: 18, centerTop: String(totalMot), centerBottom: 'salidas', interactive: true })}
+      ${donutLegend(items, totalMot, true)}
+    </div>
+  `;
+
+  // Wire segment hover (tooltip) + click (navigate)
+  const svg = dashMotivos.querySelector('svg');
+  if (svg) {
+    svg.querySelectorAll('.donut-seg--interactive').forEach((seg, idx) => {
+      seg.addEventListener('mouseenter', (e) => showMotivoTooltip(idx, items, totalMot, e.clientX, e.clientY));
+      seg.addEventListener('mousemove', (e) => showChartTooltip(undefined, e.clientX, e.clientY));
+      seg.addEventListener('mouseleave', hideChartTooltip);
+      seg.addEventListener('click', () => navigateToMotivosReport());
+    });
+  }
+  // Wire legend items
+  dashMotivos.querySelectorAll('.donut-legend-item--clickable').forEach((li, idx) => {
+    li.addEventListener('mouseenter', (e) => showMotivoTooltip(idx, items, totalMot, e.clientX, e.clientY));
+    li.addEventListener('mousemove', (e) => showChartTooltip(undefined, e.clientX, e.clientY));
+    li.addEventListener('mouseleave', hideChartTooltip);
+    li.addEventListener('click', () => navigateToMotivosReport());
+  });
+}
+
+function showMotivoTooltip(idx, items, total, x, y) {
+  const it = items[idx];
+  if (!it) return;
+  const pct = total > 0 ? ((it.value / total) * 100).toFixed(1) : '0';
+  showChartTooltip(
+    `<div class="ct-title">
+       <span class="ct-dot" style="background:${it.color}"></span>${escapeHtml(it.label)}
+     </div>
+     <div class="ct-row"><span class="ct-label">Total</span><span class="ct-value">${it.value}</span></div>
+     <div class="ct-row"><span class="ct-label">%</span><span class="ct-value">${pct}%</span></div>
+     <div class="ct-hint">Click para abrir el reporte</div>`,
+    x, y
+  );
+}
+
+// ── Navigation helpers ────────────────────────────────────────
+function navigateToMotivosReport() {
+  const stats = dashState.lastStats;
+  if (!stats) return;
+  switchView('rep-salidas-motivo');
+  // Pre-fill dates from current range and generate
+  const repIni = document.getElementById('rep-sm-ini');
+  const repFin = document.getElementById('rep-sm-fin');
+  if (repIni && repFin) {
+    repIni.value = stats.rangeIni;
+    repFin.value = stats.rangeFin;
+    if (typeof repSmGenerar === 'function') repSmGenerar();
+  }
+}
+
+function navigateToHistorial(empleadoId) {
+  if (!empleadoId) return;
+  switchView('rep-historial');
+  const sel = document.getElementById('rep-hi-empleado');
+  const ini = document.getElementById('rep-hi-ini');
+  const fin = document.getElementById('rep-hi-fin');
+  const trigger = () => {
+    if (!sel) return;
+    const value = String(empleadoId);
+    if ([...sel.options].some((o) => o.value === value)) {
+      sel.value = value;
+      // Default range: last 30 days
+      const today = new Date();
+      const past = new Date(today); past.setDate(past.getDate() - 29);
+      const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (ini) ini.value = fmt(past);
+      if (fin) fin.value = fmt(today);
+      const btn = document.getElementById('rep-hi-buscar');
+      if (btn) btn.click();
+      return true;
+    }
+    return false;
+  };
+  // The empleado select may not be populated yet; retry briefly.
+  if (!trigger()) {
+    let tries = 0;
+    const iv = setInterval(() => {
+      tries++;
+      if (trigger() || tries > 20) clearInterval(iv);
+    }, 100);
   }
 }
 
 async function loadDashboardStats() {
-  const res = await window.api.getDashboardStats();
+  const res = await window.api.getDashboardStats(dashState.range);
   if (!res?.ok) return;
   renderDashboard(res.stats);
 }
@@ -311,6 +568,28 @@ function stopDashboardAutoRefresh() {
 }
 
 document.getElementById('dash-refresh').addEventListener('click', loadDashboardStats);
+
+// Range pills
+dashRange.querySelectorAll('.dash-range-pill').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const newRange = btn.dataset.range;
+    if (!newRange || newRange === dashState.range) return;
+    dashState.range = newRange;
+    dashState.hiddenSeries = new Set(); // reset toggles when range changes
+    dashRange.querySelectorAll('.dash-range-pill').forEach((b) => {
+      const active = b.dataset.range === newRange;
+      b.classList.toggle('is-active', active);
+      b.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    loadDashboardStats();
+  });
+});
+
+// Hide tooltip when leaving the dashboard view
+document.addEventListener('mousedown', (e) => {
+  if (e.target.closest('.line-band, .donut-seg--interactive, .donut-legend-item--clickable')) return;
+  hideChartTooltip();
+}, true);
 
 // ── Usuarios view ─────────────────────────────────────────────
 const usersTbody = document.getElementById('users-tbody');
@@ -1250,21 +1529,23 @@ regLogTbody.addEventListener('click', (e) => {
 
 // ── Sidebar navigation ────────────────────────────────────────
 const VIEWS = {
-  dashboard:             { eyebrow: 'Panel',         title: 'Dashboard' },
-  registro:              { eyebrow: 'Asistencia',    title: 'Registro' },
-  empleados:             { eyebrow: 'Personal',      title: 'Empleados' },
-  'tipos-salida':        { eyebrow: 'Catálogos',     title: 'Motivos' },
-  'rep-asistencia-dia':  { eyebrow: 'Reportes',      title: 'Asistencia del día' },
-  'rep-historial':       { eyebrow: 'Reportes',      title: 'Historial por empleado' },
-  'rep-salidas-motivo':  { eyebrow: 'Reportes',      title: 'Salidas por motivo' },
-  usuarios:              { eyebrow: 'Configuración', title: 'Usuarios' },
-  accesos:               { eyebrow: 'Configuración', title: 'Accesos' },
-  auditoria:             { eyebrow: 'Configuración', title: 'Auditoría' },
-  apariencia:            { eyebrow: 'Configuración', title: 'Apariencia' },
+  dashboard:                { eyebrow: 'Panel',         title: 'Dashboard' },
+  registro:                 { eyebrow: 'Asistencia',    title: 'Registro' },
+  empleados:                { eyebrow: 'Personal',      title: 'Empleados' },
+  'tipos-salida':           { eyebrow: 'Catálogos',     title: 'Motivos' },
+  'rep-asistencia-dia':     { eyebrow: 'Reportes',      title: 'Asistencia del día' },
+  'rep-historial':          { eyebrow: 'Reportes',      title: 'Historial por empleado' },
+  'rep-salidas-motivo':     { eyebrow: 'Reportes',      title: 'Salidas por motivo' },
+  'rep-horas-dentro-fuera': { eyebrow: 'Reportes',      title: 'Horas dentro/fuera' },
+  'configuracion-general':  { eyebrow: 'Configuración', title: 'General' },
+  usuarios:                 { eyebrow: 'Configuración', title: 'Usuarios' },
+  accesos:                  { eyebrow: 'Configuración', title: 'Accesos' },
+  auditoria:                { eyebrow: 'Configuración', title: 'Auditoría' },
+  apariencia:               { eyebrow: 'Configuración', title: 'Apariencia' },
 };
-const CONFIG_VIEWS = new Set(['usuarios', 'accesos', 'auditoria', 'apariencia']);
+const CONFIG_VIEWS = new Set(['configuracion-general', 'usuarios', 'accesos', 'auditoria', 'apariencia']);
 const CATALOGOS_VIEWS = new Set(['tipos-salida']);
-const REPORTES_VIEWS = new Set(['rep-asistencia-dia', 'rep-historial', 'rep-salidas-motivo']);
+const REPORTES_VIEWS = new Set(['rep-asistencia-dia', 'rep-historial', 'rep-salidas-motivo', 'rep-horas-dentro-fuera']);
 
 const navItems = document.querySelectorAll('#sidebar-nav .nav-item[data-view]');
 const viewEls = document.querySelectorAll('.view');
@@ -1283,6 +1564,8 @@ document.getElementById('nav-icon-chevron-reportes').innerHTML = I.chevron(13);
 document.getElementById('nav-icon-rep-asistencia').innerHTML = I.registro(15);
 document.getElementById('nav-icon-rep-historial').innerHTML = I.user(15);
 document.getElementById('nav-icon-rep-salidas').innerHTML = I.exit(15);
+document.getElementById('nav-icon-rep-horas').innerHTML = I.clipboard(15);
+document.getElementById('nav-icon-configuracion-general').innerHTML = I.settings(15);
 
 function setGroupOpen(open) {
   configGroup.classList.toggle('is-open', open);
@@ -1315,6 +1598,9 @@ function switchView(key) {
   if (key === 'empleados' && !empleadosLoaded) loadEmpleados();
   if (key === 'registro') loadTodayEvents();
   if (key === 'rep-historial') loadRepHiEmpleados();
+  if (key === 'rep-horas-dentro-fuera') refreshHdScheduleNote();
+  if (key === 'configuracion-general' && !cfgLoaded) loadCfgSchedule();
+  if (key === 'auditoria') { loadAuditFilters().then(loadAuditLog); }
   if (key === 'dashboard') startDashboardAutoRefresh();
   else stopDashboardAutoRefresh();
   if (key === 'tipos-salida') loadTiposAll();
@@ -1929,6 +2215,590 @@ function repSmExportPayload(format) {
 
 repSmXlsx.addEventListener('click', () => { const p = repSmExportPayload('xlsx'); if (p) handleExport('xlsx', p); });
 repSmPdf .addEventListener('click', () => { const p = repSmExportPayload('pdf');  if (p) handleExport('pdf',  p); });
+
+// ── Configuración general (horario laboral) ───────────────────
+const cfgWorkStart = document.getElementById('cfg-work-start');
+const cfgWorkEnd   = document.getElementById('cfg-work-end');
+const cfgWeekdays  = document.getElementById('cfg-weekdays');
+const cfgSaveBtn   = document.getElementById('cfg-save-btn');
+const cfgError     = document.getElementById('cfg-error');
+const cfgSuccess   = document.getElementById('cfg-success');
+
+const WEEKDAY_LABELS = [
+  { iso: 1, short: 'L', long: 'Lunes' },
+  { iso: 2, short: 'M', long: 'Martes' },
+  { iso: 3, short: 'X', long: 'Miércoles' },
+  { iso: 4, short: 'J', long: 'Jueves' },
+  { iso: 5, short: 'V', long: 'Viernes' },
+  { iso: 6, short: 'S', long: 'Sábado' },
+  { iso: 7, short: 'D', long: 'Domingo' },
+];
+
+let cfgScheduleCache = null;
+let cfgLoaded = false;
+
+function renderWeekdayPills(selectedSet) {
+  cfgWeekdays.innerHTML = WEEKDAY_LABELS.map((w) => `
+    <button type="button" class="cfg-weekday ${selectedSet.has(w.iso) ? 'is-active' : ''}" data-iso="${w.iso}" title="${w.long}" aria-pressed="${selectedSet.has(w.iso) ? 'true' : 'false'}">
+      ${w.short}
+    </button>
+  `).join('');
+  cfgWeekdays.querySelectorAll('.cfg-weekday').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const iso = +btn.dataset.iso;
+      if (selectedSet.has(iso)) selectedSet.delete(iso); else selectedSet.add(iso);
+      btn.classList.toggle('is-active');
+      btn.setAttribute('aria-pressed', btn.classList.contains('is-active') ? 'true' : 'false');
+    });
+  });
+}
+
+let cfgSelectedDays = new Set();
+
+async function loadCfgSchedule() {
+  cfgError.classList.add('hidden');
+  cfgSuccess.classList.add('hidden');
+  const res = await window.api.getWorkSchedule();
+  if (!res?.ok) {
+    cfgError.textContent = res?.error || 'No se pudo cargar el horario';
+    cfgError.classList.remove('hidden');
+    return;
+  }
+  cfgScheduleCache = res.schedule;
+  cfgWorkStart.value = res.schedule.work_start;
+  cfgWorkEnd.value   = res.schedule.work_end;
+  cfgSelectedDays = new Set(res.schedule.work_days);
+  renderWeekdayPills(cfgSelectedDays);
+  cfgLoaded = true;
+}
+
+cfgSaveBtn.addEventListener('click', async () => {
+  cfgError.classList.add('hidden');
+  cfgSuccess.classList.add('hidden');
+  cfgSaveBtn.disabled = true;
+  const payload = {
+    work_start: cfgWorkStart.value,
+    work_end:   cfgWorkEnd.value,
+    work_days:  Array.from(cfgSelectedDays),
+  };
+  const res = await window.api.setWorkSchedule(payload);
+  cfgSaveBtn.disabled = false;
+  if (!res?.ok) {
+    cfgError.textContent = res?.error || 'No se pudo guardar';
+    cfgError.classList.remove('hidden');
+    return;
+  }
+  cfgScheduleCache = res.schedule;
+  cfgSuccess.classList.remove('hidden');
+  setTimeout(() => cfgSuccess.classList.add('hidden'), 2500);
+});
+
+// ── Reporte 4: Horas dentro/fuera ─────────────────────────────
+const repHdIni     = document.getElementById('rep-hd-ini');
+const repHdFin     = document.getElementById('rep-hd-fin');
+const repHdTbody   = document.getElementById('rep-hd-tbody');
+const repHdSummary = document.getElementById('rep-hd-summary');
+const repHdBuscar  = document.getElementById('rep-hd-buscar');
+const repHdXlsx    = document.getElementById('rep-hd-xlsx');
+const repHdPdf     = document.getElementById('rep-hd-pdf');
+const repHdScheduleNote = document.getElementById('rep-hd-schedule');
+document.getElementById('rep-hd-xlsx-icon').innerHTML = I.fileSpreadsheet(14);
+document.getElementById('rep-hd-pdf-icon').innerHTML = I.filePdf(14);
+let repHdData = null;
+
+(function initRepHdDates() {
+  const today = new Date();
+  const past = new Date(today); past.setDate(past.getDate() - 29);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  repHdIni.value = fmt(past);
+  repHdFin.value = fmt(today);
+})();
+
+function fmtSecondsHM(sec) {
+  const s = Math.max(0, Math.round(sec || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+function fmtPct(pct) {
+  if (!Number.isFinite(pct)) return '0%';
+  return `${pct.toFixed(1)}%`;
+}
+function weekdayShortFromIso(iso) {
+  const w = WEEKDAY_LABELS.find((x) => x.iso === iso);
+  return w ? w.short : '?';
+}
+
+async function refreshHdScheduleNote() {
+  const res = await window.api.getWorkSchedule();
+  if (!res?.ok) { repHdScheduleNote.textContent = ''; return; }
+  const days = res.schedule.work_days.map(weekdayShortFromIso).join(' ');
+  repHdScheduleNote.textContent = ` · Horario: ${res.schedule.work_start}–${res.schedule.work_end} (${days})`;
+}
+
+async function repHdGenerar() {
+  repHdTbody.innerHTML = '<tr class="users-empty-row"><td colspan="6">Cargando…</td></tr>';
+  repHdSummary.classList.add('hidden');
+  repHdXlsx.disabled = true; repHdPdf.disabled = true;
+
+  const res = await window.api.reporteHorasDentroFuera(repHdIni.value, repHdFin.value);
+  if (!res?.ok) {
+    repHdTbody.innerHTML = `<tr class="users-empty-row"><td colspan="6">${escapeHtml(res?.error || 'Error')}</td></tr>`;
+    return;
+  }
+  repHdData = res;
+
+  const totalInside  = res.rows.reduce((s, r) => s + r.inside_sec, 0);
+  const totalOutside = res.rows.reduce((s, r) => s + r.outside_sec, 0);
+  const totalDenom   = totalInside + totalOutside;
+  const promCumpl    = totalDenom > 0 ? (totalInside / totalDenom) * 100 : 0;
+  const activosTotal = res.rows.length;
+  const activosConActividad = res.rows.filter((r) => r.dias_con_actividad > 0).length;
+
+  repHdSummary.innerHTML = `
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Días laborables</span>
+      <span class="rep-summary-value rep-summary-value--xl">${res.dias_laborables}</span>
+      <span class="rep-summary-sub">${escapeHtml(res.rango.ini)} → ${escapeHtml(res.rango.fin)}</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Total dentro</span>
+      <span class="rep-summary-value rep-summary-value--xl">${fmtSecondsHM(totalInside)}</span>
+      <span class="rep-summary-sub">acumulado de empleados</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Total fuera en horario</span>
+      <span class="rep-summary-value rep-summary-value--xl">${fmtSecondsHM(totalOutside)}</span>
+      <span class="rep-summary-sub">incluye llegadas tarde y salidas tempranas</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Cumplimiento promedio</span>
+      <span class="rep-summary-value rep-summary-value--xl">${fmtPct(promCumpl)}</span>
+      <span class="rep-summary-sub">${activosConActividad}/${activosTotal} empleados con actividad</span>
+    </div>
+  `;
+  repHdSummary.classList.remove('hidden');
+
+  if (!res.rows.length) {
+    repHdTbody.innerHTML = '<tr class="users-empty-row"><td colspan="6">No hay empleados activos.</td></tr>';
+    return;
+  }
+
+  repHdTbody.innerHTML = res.rows.map((r) => {
+    const pct = Math.max(0, Math.min(100, r.pct_cumplimiento));
+    const barColor = pct >= 85 ? 'var(--success)' : pct >= 60 ? '#f3bc4b' : 'var(--error)';
+    const sinAct = r.dias_con_actividad === 0;
+    return `
+      <tr class="rep-hd-row ${sinAct ? 'is-muted' : ''}" data-empleado-id="${r.empleado_id}">
+        <td>
+          <div class="user-cell">
+            <div class="user-cell-avatar">${escapeHtml(initials(r.nombre, r.apellidos))}</div>
+            <div class="user-cell-text">
+              <div class="user-cell-name">${escapeHtml(r.nombre)} ${escapeHtml(r.apellidos)}</div>
+              <div class="user-cell-handle">#${escapeHtml(r.numero_empleado)}</div>
+            </div>
+          </div>
+        </td>
+        <td style="text-align: right;">
+          <span class="rep-bar-num">${r.dias_con_actividad}<span class="users-muted">/${r.dias_laborables}</span></span>
+        </td>
+        <td style="text-align: right;"><span class="rep-bar-num">${fmtSecondsHM(r.inside_sec)}</span></td>
+        <td style="text-align: right;"><span class="rep-bar-num">${fmtSecondsHM(r.outside_sec)}</span></td>
+        <td>
+          <div class="rep-hd-pct-cell">
+            <div class="rep-hd-pct-bar">
+              <span class="rep-hd-pct-fill" style="width:${pct}%; background:${barColor};"></span>
+            </div>
+            <span class="rep-hd-pct-num">${fmtPct(r.pct_cumplimiento)}</span>
+          </div>
+        </td>
+        <td>
+          <div class="users-row-actions">
+            <button type="button" class="row-icon-btn" data-action="hd-detail" data-id="${r.empleado_id}" title="Ver detalle" aria-label="Ver detalle">${I.eye(15)}</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  repHdXlsx.disabled = false; repHdPdf.disabled = false;
+}
+
+repHdBuscar.addEventListener('click', repHdGenerar);
+
+// Row click + detail action → open drill-down
+repHdTbody.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action="hd-detail"]');
+  if (btn) {
+    e.stopPropagation();
+    openHdDetail(+btn.dataset.id);
+    return;
+  }
+  const row = e.target.closest('tr[data-empleado-id]');
+  if (row && !row.classList.contains('users-empty-row')) {
+    openHdDetail(+row.dataset.empleadoId);
+  }
+});
+
+// Export payloads
+function repHdExportPayload(format) {
+  if (!repHdData) return null;
+  const r = repHdData.rango;
+  const sched = repHdData.schedule;
+  const columns = [
+    { key: 'numero',    header: 'Número',         width: 12 },
+    { key: 'empleado',  header: 'Empleado',       width: 28 },
+    { key: 'dias',      header: 'Días con act.',  width: 14 },
+    { key: 'dentro',    header: 'Dentro',         width: 14 },
+    { key: 'fuera',     header: 'Fuera (horar.)', width: 14 },
+    { key: 'pct',       header: 'Cumplimiento',   width: 14 },
+  ];
+  const data = repHdData.rows.map((row) => ({
+    numero:   row.numero_empleado,
+    empleado: `${row.nombre} ${row.apellidos}`,
+    dias:     `${row.dias_con_actividad}/${row.dias_laborables}`,
+    dentro:   fmtSecondsHM(row.inside_sec),
+    fuera:    fmtSecondsHM(row.outside_sec),
+    pct:      fmtPct(row.pct_cumplimiento),
+  }));
+  if (format === 'xlsx') {
+    return {
+      title: `Horas dentro-fuera · ${r.ini} al ${r.fin}`,
+      columns, rows: data,
+      defaultBase: `horas-dentro-fuera-${r.ini}_${r.fin}`,
+    };
+  }
+  return {
+    title: 'Horas dentro/fuera',
+    subtitle: `Del ${fmtDateLong(r.ini)} al ${fmtDateLong(r.fin)} · Horario ${sched.work_start}–${sched.work_end}`,
+    summary: [
+      { label: 'Desde',           value: fmtDateLong(r.ini) },
+      { label: 'Hasta',           value: fmtDateLong(r.fin) },
+      { label: 'Días laborables', value: repHdData.dias_laborables },
+      { label: 'Empleados',       value: repHdData.rows.length },
+    ],
+    headers: ['#', 'Empleado', 'Días', 'Dentro', 'Fuera', 'Cumpl.'],
+    rows: repHdData.rows.map((row) => [
+      row.numero_empleado,
+      `${row.nombre} ${row.apellidos}`,
+      `${row.dias_con_actividad}/${row.dias_laborables}`,
+      fmtSecondsHM(row.inside_sec),
+      fmtSecondsHM(row.outside_sec),
+      fmtPct(row.pct_cumplimiento),
+    ]),
+    defaultBase: `horas-dentro-fuera-${r.ini}_${r.fin}`,
+  };
+}
+repHdXlsx.addEventListener('click', () => { const p = repHdExportPayload('xlsx'); if (p) handleExport('xlsx', p); });
+repHdPdf .addEventListener('click', () => { const p = repHdExportPayload('pdf');  if (p) handleExport('pdf',  p); });
+
+// ── Drill-down modal ──────────────────────────────────────────
+const hdModal = document.getElementById('rep-hd-modal');
+const hdModalTitle = document.getElementById('rep-hd-modal-title');
+const hdModalSummary = document.getElementById('rep-hd-modal-summary');
+const hdModalTbody = document.getElementById('rep-hd-modal-tbody');
+document.getElementById('icon-hdmodal-close').innerHTML = I.close(14);
+
+function closeHdModal() { hdModal.classList.add('hidden'); }
+hdModal.addEventListener('click', (e) => {
+  if (e.target === hdModal || e.target.closest('[data-hdmodal-close]')) closeHdModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !hdModal.classList.contains('hidden')) closeHdModal();
+});
+
+async function openHdDetail(empleadoId) {
+  if (!empleadoId || !repHdData) return;
+  hdModalSummary.innerHTML = '<div class="users-muted" style="padding: 8px;">Cargando…</div>';
+  hdModalTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Cargando…</td></tr>';
+  hdModal.classList.remove('hidden');
+
+  const r = repHdData.rango;
+  const res = await window.api.reporteHorasDentroFueraEmpleado(empleadoId, r.ini, r.fin);
+  if (!res?.ok) {
+    hdModalTitle.textContent = 'Detalle por día';
+    hdModalSummary.innerHTML = '';
+    hdModalTbody.innerHTML = `<tr class="users-empty-row"><td colspan="5">${escapeHtml(res?.error || 'Error')}</td></tr>`;
+    return;
+  }
+
+  const emp = res.empleado;
+  hdModalTitle.textContent = `Detalle: ${emp.nombre} ${emp.apellidos}`;
+
+  const denom = res.total_inside_sec + res.total_outside_sec;
+  const pct = denom > 0 ? (res.total_inside_sec / denom) * 100 : 0;
+
+  hdModalSummary.innerHTML = `
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Empleado</span>
+      <span class="rep-summary-value rep-summary-value--md">#${escapeHtml(emp.numero_empleado)}</span>
+      <span class="rep-summary-sub">${escapeHtml(emp.puesto || '—')}</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Dentro</span>
+      <span class="rep-summary-value rep-summary-value--xl">${fmtSecondsHM(res.total_inside_sec)}</span>
+      <span class="rep-summary-sub">${res.dias_con_actividad}/${res.dias_laborables} días</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Fuera en horario</span>
+      <span class="rep-summary-value rep-summary-value--xl">${fmtSecondsHM(res.total_outside_sec)}</span>
+      <span class="rep-summary-sub">${res.dias_ausente} días ausente</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Cumplimiento</span>
+      <span class="rep-summary-value rep-summary-value--xl">${fmtPct(pct)}</span>
+      <span class="rep-summary-sub">${escapeHtml(res.rango.ini)} → ${escapeHtml(res.rango.fin)}</span>
+    </div>
+  `;
+
+  if (!res.days.length) {
+    hdModalTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Sin días laborables en el rango.</td></tr>';
+    return;
+  }
+  hdModalTbody.innerHTML = res.days.map((d) => {
+    if (d.ausente) {
+      return `
+        <tr class="rep-hd-detail-row is-ausente">
+          <td>${escapeHtml(fmtDateLong(d.date))}</td>
+          <td colspan="4"><span class="badge badge-muted">Ausente</span></td>
+        </tr>
+      `;
+    }
+    const pctD = Math.max(0, Math.min(100, d.pct));
+    const barColor = pctD >= 85 ? 'var(--success)' : pctD >= 60 ? '#f3bc4b' : 'var(--error)';
+    const evs = d.events.map((e) => {
+      const cls = e.tipo === 'entrada' ? 'reg-tipo-badge--in' : 'reg-tipo-badge--out';
+      const motivo = e.motivo ? ` · ${escapeHtml(e.motivo)}` : '';
+      return `<span class="rep-hd-evt"><span class="reg-tipo-badge ${cls}">${e.tipo === 'entrada' ? '↓' : '↑'}</span><span class="rep-hd-evt-time">${escapeHtml(e.time)}</span>${motivo}</span>`;
+    }).join('');
+    return `
+      <tr class="rep-hd-detail-row">
+        <td>${escapeHtml(fmtDateLong(d.date))}</td>
+        <td style="text-align: right;"><span class="rep-bar-num">${fmtSecondsHM(d.inside_sec)}</span></td>
+        <td style="text-align: right;"><span class="rep-bar-num">${fmtSecondsHM(d.outside_sec)}</span></td>
+        <td>
+          <div class="rep-hd-pct-cell">
+            <div class="rep-hd-pct-bar">
+              <span class="rep-hd-pct-fill" style="width:${pctD}%; background:${barColor};"></span>
+            </div>
+            <span class="rep-hd-pct-num">${fmtPct(d.pct)}</span>
+          </div>
+        </td>
+        <td><div class="rep-hd-evts">${evs}</div></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ── Auditoría ─────────────────────────────────────────────────
+const auditIniEl = document.getElementById('audit-ini');
+const auditFinEl = document.getElementById('audit-fin');
+const auditActionEl = document.getElementById('audit-action');
+const auditUserEl = document.getElementById('audit-user');
+const auditSearchEl = document.getElementById('audit-search');
+const auditTbody = document.getElementById('audit-tbody');
+const auditCountEl = document.getElementById('audit-count');
+const auditBuscarBtn = document.getElementById('audit-buscar');
+const auditRefreshBtn = document.getElementById('audit-refresh');
+const auditPager = document.getElementById('audit-pager');
+const auditPrev = document.getElementById('audit-prev');
+const auditNext = document.getElementById('audit-next');
+const auditPageInfo = document.getElementById('audit-page-info');
+
+const AUDIT_PAGE_SIZE = 50;
+const auditState = {
+  offset: 0,
+  total: 0,
+  loaded: false,
+  filtersLoaded: false,
+};
+
+(function initAuditDates() {
+  const today = new Date();
+  const past = new Date(today); past.setDate(past.getDate() - 6);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  auditIniEl.value = fmt(past);
+  auditFinEl.value = fmt(today);
+})();
+
+// Labels for action codes (Spanish, friendly).
+const AUDIT_ACTION_LABELS = {
+  'auth.login':                'Inicio de sesión',
+  'auth.login_fail':           'Login fallido',
+  'auth.logout':               'Cierre de sesión',
+  'auth.setup_initial_user':   'Setup inicial',
+  'auth.reauth_fail':          'Reautenticación fallida',
+  'user.create':               'Usuario · alta',
+  'user.update':               'Usuario · edición',
+  'user.estatus_change':       'Usuario · estatus',
+  'user.permissions_change':   'Usuario · permisos',
+  'user.settings_change':      'Usuario · preferencias',
+  'empleado.create':           'Empleado · alta',
+  'empleado.update':           'Empleado · edición',
+  'empleado.estatus_change':   'Empleado · estatus',
+  'evento.create':             'Registro · alta',
+  'evento.update':             'Registro · edición',
+  'evento.delete':             'Registro · eliminación',
+  'catalogo.create':           'Catálogo · alta',
+  'catalogo.update':           'Catálogo · edición',
+  'catalogo.estatus_change':   'Catálogo · estatus',
+  'catalogo.delete':           'Catálogo · eliminación',
+  'config.work_schedule_update': 'Horario laboral · cambio',
+};
+function auditActionLabel(code) {
+  return AUDIT_ACTION_LABELS[code] || code;
+}
+function auditActionKind(code) {
+  if (!code) return 'neutral';
+  if (code.includes('_fail')) return 'danger';
+  if (code.endsWith('.delete')) return 'danger';
+  if (code.startsWith('auth.')) return 'auth';
+  if (code.endsWith('.create')) return 'create';
+  if (code.endsWith('.update') || code.endsWith('.estatus_change') || code.endsWith('.permissions_change') || code.endsWith('.settings_change') || code.endsWith('.work_schedule_update')) return 'update';
+  return 'neutral';
+}
+
+function auditFmtDateTime(iso) {
+  if (!iso) return '—';
+  const utcIso = iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z';
+  const d = new Date(utcIso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('es-MX', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+  });
+}
+
+async function loadAuditFilters() {
+  if (auditState.filtersLoaded) return;
+  const [actRes, userRes] = await Promise.all([
+    window.api.auditListActions(),
+    window.api.auditListUsers(),
+  ]);
+  if (actRes?.ok) {
+    auditActionEl.innerHTML = '<option value="">Todas</option>' +
+      actRes.actions.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(auditActionLabel(a))}</option>`).join('');
+  }
+  if (userRes?.ok) {
+    auditUserEl.innerHTML = '<option value="">Todos</option>' +
+      userRes.users.map((u) => `<option value="${u.id}">${escapeHtml(u.username)}</option>`).join('');
+  }
+  auditState.filtersLoaded = true;
+}
+
+function getAuditFilters() {
+  return {
+    ini: auditIniEl.value,
+    fin: auditFinEl.value,
+    action: auditActionEl.value,
+    userId: auditUserEl.value ? parseInt(auditUserEl.value, 10) : null,
+    search: auditSearchEl.value.trim(),
+    limit: AUDIT_PAGE_SIZE,
+    offset: auditState.offset,
+  };
+}
+
+async function loadAuditLog() {
+  auditTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Cargando…</td></tr>';
+  auditPager.classList.add('hidden');
+  const res = await window.api.auditList(getAuditFilters());
+  if (!res?.ok) {
+    auditCountEl.textContent = '0';
+    auditTbody.innerHTML = `<tr class="users-empty-row"><td colspan="5">${escapeHtml(res?.error || 'Error')}</td></tr>`;
+    return;
+  }
+  auditState.total = res.total;
+  auditState.loaded = true;
+  auditCountEl.textContent = res.total;
+
+  if (!res.rows.length) {
+    auditTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Sin eventos en este filtro.</td></tr>';
+    return;
+  }
+
+  auditTbody.innerHTML = res.rows.map((row) => {
+    const kind = auditActionKind(row.action);
+    const label = auditActionLabel(row.action);
+    const entityLabel = row.entity_label || (row.entity_type ? `${row.entity_type}#${row.entity_id ?? ''}` : '—');
+    return `
+      <tr class="audit-row" data-id="${row.id}">
+        <td><span class="audit-time">${escapeHtml(auditFmtDateTime(row.timestamp))}</span></td>
+        <td><span class="audit-user">@${escapeHtml(row.username)}</span></td>
+        <td><span class="audit-badge audit-badge--${kind}">${escapeHtml(label)}</span></td>
+        <td>
+          <div class="audit-entity">
+            <span class="audit-entity-label">${escapeHtml(entityLabel)}</span>
+            <span class="audit-entity-type">${escapeHtml(row.entity_type || '')}</span>
+          </div>
+        </td>
+        <td style="text-align: right;">
+          <button type="button" class="row-icon-btn" data-audit-view="${row.id}" title="Ver detalle" aria-label="Ver detalle">${I.eye(15)}</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Pager
+  const start = res.offset + 1;
+  const end = Math.min(res.offset + res.rows.length, res.total);
+  auditPageInfo.textContent = `${start}–${end} de ${res.total}`;
+  auditPrev.disabled = res.offset === 0;
+  auditNext.disabled = end >= res.total;
+  auditPager.classList.remove('hidden');
+
+  // Cache row data for detail modal
+  auditState.lastRows = new Map(res.rows.map((r) => [r.id, r]));
+}
+
+auditBuscarBtn.addEventListener('click', () => { auditState.offset = 0; loadAuditLog(); });
+auditRefreshBtn.addEventListener('click', () => { auditState.offset = 0; loadAuditLog(); });
+auditSearchEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { auditState.offset = 0; loadAuditLog(); }
+});
+auditActionEl.addEventListener('change', () => { auditState.offset = 0; loadAuditLog(); });
+auditUserEl.addEventListener('change', () => { auditState.offset = 0; loadAuditLog(); });
+
+auditPrev.addEventListener('click', () => {
+  if (auditState.offset === 0) return;
+  auditState.offset = Math.max(0, auditState.offset - AUDIT_PAGE_SIZE);
+  loadAuditLog();
+});
+auditNext.addEventListener('click', () => {
+  if (auditState.offset + AUDIT_PAGE_SIZE >= auditState.total) return;
+  auditState.offset += AUDIT_PAGE_SIZE;
+  loadAuditLog();
+});
+
+// Detail modal
+const auditDetailModal = document.getElementById('audit-detail-modal');
+const auditDetailMeta = document.getElementById('audit-detail-meta');
+const auditDetailJson = document.getElementById('audit-detail-json');
+document.getElementById('icon-audmodal-close').innerHTML = I.close(14);
+
+function closeAuditDetail() { auditDetailModal.classList.add('hidden'); }
+auditDetailModal.addEventListener('click', (e) => {
+  if (e.target === auditDetailModal || e.target.closest('[data-audmodal-close]')) closeAuditDetail();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !auditDetailModal.classList.contains('hidden')) closeAuditDetail();
+});
+
+auditTbody.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-audit-view]');
+  if (!btn) return;
+  const id = parseInt(btn.dataset.auditView, 10);
+  const row = auditState.lastRows?.get(id);
+  if (!row) return;
+  const kind = auditActionKind(row.action);
+  auditDetailMeta.innerHTML = `
+    <div class="audit-detail-meta-row"><span class="audit-detail-meta-label">Fecha</span><span>${escapeHtml(auditFmtDateTime(row.timestamp))}</span></div>
+    <div class="audit-detail-meta-row"><span class="audit-detail-meta-label">Usuario</span><span>@${escapeHtml(row.username)}</span></div>
+    <div class="audit-detail-meta-row"><span class="audit-detail-meta-label">Acción</span><span class="audit-badge audit-badge--${kind}">${escapeHtml(auditActionLabel(row.action))}</span></div>
+    <div class="audit-detail-meta-row"><span class="audit-detail-meta-label">Entidad</span><span>${escapeHtml(row.entity_label || row.entity_type || '—')}</span></div>
+  `;
+  auditDetailJson.textContent = row.details ? JSON.stringify(row.details, null, 2) : '(sin datos adicionales)';
+  auditDetailModal.classList.remove('hidden');
+});
 
 // ── Logout ────────────────────────────────────────────────────
 document.getElementById('logout-btn').addEventListener('click', async () => {

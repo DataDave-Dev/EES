@@ -71,6 +71,10 @@
                 <span class="nav-icon" id="nav-icon-rep-salidas"></span>
                 <span class="nav-label">Salidas por motivo</span>
               </button>
+              <button type="button" class="nav-item nav-sub" data-view="rep-horas-dentro-fuera">
+                <span class="nav-icon" id="nav-icon-rep-horas"></span>
+                <span class="nav-label">Horas dentro/fuera</span>
+              </button>
             </div>
           </div>
         </div>
@@ -83,6 +87,10 @@
           </button>
           <div class="nav-group-children">
             <div class="nav-group-children-inner">
+              <button type="button" class="nav-item nav-sub" data-view="configuracion-general">
+                <span class="nav-icon" id="nav-icon-configuracion-general"></span>
+                <span class="nav-label">General</span>
+              </button>
               <button type="button" class="nav-item nav-sub" data-view="usuarios">
                 <span class="nav-icon" id="nav-icon-usuarios"></span>
                 <span class="nav-label">Usuarios</span>
@@ -139,7 +147,14 @@
               <div class="identity-sub" style="color: var(--accent);">Resumen</div>
               <h2 id="greeting" class="dash-greeting-title">Bienvenido</h2>
             </div>
-            <button type="button" id="dash-refresh" class="users-refresh-link">Actualizar</button>
+            <div class="dash-greeting-actions">
+              <div class="dash-range" id="dash-range" role="tablist" aria-label="Rango">
+                <button type="button" class="dash-range-pill is-active" data-range="today" role="tab" aria-selected="true">Hoy</button>
+                <button type="button" class="dash-range-pill" data-range="7d" role="tab" aria-selected="false">7 días</button>
+                <button type="button" class="dash-range-pill" data-range="30d" role="tab" aria-selected="false">30 días</button>
+              </div>
+              <button type="button" id="dash-refresh" class="users-refresh-link">Actualizar</button>
+            </div>
           </div>
 
           <!-- KPI cards -->
@@ -166,12 +181,12 @@
             </div>
           </div>
 
-          <!-- Actividad por hora (full width) -->
+          <!-- Actividad (full width) -->
           <div class="window dash-card dash-card--chart">
             <div class="dash-card-head">
               <div>
-                <h3 class="dash-card-title">Actividad por hora</h3>
-                <span class="dash-card-sub">entradas y salidas registradas hoy</span>
+                <h3 class="dash-card-title" id="dash-hourly-title">Actividad por hora</h3>
+                <span class="dash-card-sub" id="dash-hourly-sub">entradas y salidas registradas hoy</span>
               </div>
               <div id="dash-hourly-legend" class="dash-card-legend"></div>
             </div>
@@ -192,11 +207,11 @@
               </ul>
             </div>
 
-            <!-- Salidas por motivo 7d (donut) -->
+            <!-- Salidas por motivo (donut, interactivo) -->
             <div class="window dash-card">
               <div class="dash-card-head">
                 <h3 class="dash-card-title">Salidas por motivo</h3>
-                <span class="dash-card-sub">últimos 7 días</span>
+                <span class="dash-card-sub" id="dash-motivos-sub">últimos 7 días</span>
               </div>
               <div id="dash-motivos" class="dash-motivos">
                 <div class="dash-motivos-empty">—</div>
@@ -566,12 +581,174 @@
           </div>
         </section>
 
+        <!-- Reporte: Horas dentro/fuera (resumen + drill-down) -->
+        <section class="view" data-view="rep-horas-dentro-fuera">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Horas dentro/fuera</h2>
+              <p class="users-sub">
+                Tiempo que pasan los empleados dentro y fuera de la empresa dentro del horario laboral.
+                <span id="rep-hd-schedule" class="users-muted"></span>
+              </p>
+            </div>
+            <div class="rep-toolbar-actions">
+              <button type="button" id="rep-hd-xlsx" class="rep-export-btn" disabled>
+                <span id="rep-hd-xlsx-icon"></span>
+                <span>Excel</span>
+              </button>
+              <button type="button" id="rep-hd-pdf" class="rep-export-btn" disabled>
+                <span id="rep-hd-pdf-icon"></span>
+                <span>PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="rep-filter-bar">
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Desde</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-hd-ini" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Hasta</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-hd-fin" class="rep-filter-input" />
+              </span>
+            </div>
+            <button type="button" id="rep-hd-buscar" class="btn-primary rep-generate-btn">Generar reporte</button>
+          </div>
+
+          <div id="rep-hd-summary" class="rep-summary rep-summary--cards hidden"></div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table rep-hd-table">
+                <thead>
+                  <tr>
+                    <th>Empleado</th>
+                    <th style="width: 8%; text-align: right;">Días</th>
+                    <th style="width: 11%; text-align: right;">Dentro</th>
+                    <th style="width: 11%; text-align: right;">Fuera</th>
+                    <th>Cumplimiento</th>
+                    <th class="users-actions-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="rep-hd-tbody">
+                  <tr class="users-empty-row"><td colspan="6">Selecciona rango y presiona Generar.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Configuración General view -->
+        <section class="view" data-view="configuracion-general">
+          <div style="margin-bottom: 8px;">
+            <h2 style="font-size: 20px; font-weight: 600; letter-spacing: -0.2px; margin: 0 0 4px;">Configuración general</h2>
+            <p style="color: var(--muted); font-size: 13.5px; margin: 0 0 16px;">Horario laboral que se usa para calcular las horas dentro y fuera de la empresa.</p>
+          </div>
+
+          <div class="settings-card cfg-card">
+            <div class="settings-section-title">Horario laboral</div>
+            <div class="cfg-grid">
+              <label class="field">
+                <span class="field-label">Hora de inicio</span>
+                <span class="field-shell">
+                  <input type="time" id="cfg-work-start" class="field-input" />
+                </span>
+              </label>
+              <label class="field">
+                <span class="field-label">Hora de fin</span>
+                <span class="field-shell">
+                  <input type="time" id="cfg-work-end" class="field-input" />
+                </span>
+              </label>
+            </div>
+            <div class="field" style="margin-top: 14px;">
+              <span class="field-label">Días laborales</span>
+              <div class="cfg-weekdays" id="cfg-weekdays" role="group" aria-label="Días laborales"></div>
+            </div>
+            <div id="cfg-error" class="alert-error hidden" style="margin-top: 12px;"></div>
+            <div id="cfg-success" class="alert-success hidden" style="margin-top: 12px;">Horario actualizado.</div>
+            <div class="cfg-actions">
+              <button type="button" id="cfg-save-btn" class="btn-primary btn-primary--auto">Guardar cambios</button>
+            </div>
+          </div>
+        </section>
+
         <!-- Auditoría view -->
         <section class="view" data-view="auditoria">
-          <div class="window placeholder-card">
-            <div class="placeholder-icon" id="ph-icon-auditoria"></div>
-            <h2>Auditoría</h2>
-            <p>Bitácora de acciones: quién hizo qué y cuándo. Útil para investigar incidencias y auditorías internas.</p>
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Auditoría</h2>
+              <p class="users-sub">
+                Bitácora de acciones: <span id="audit-count">—</span> registros encontrados.
+                <button type="button" id="audit-refresh" class="users-refresh-link">Actualizar</button>
+              </p>
+            </div>
+          </div>
+
+          <div class="rep-filter-bar audit-filter-bar">
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Desde</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="audit-ini" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Hasta</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="audit-fin" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item" style="flex: 1.4 1 200px;">
+              <span class="rep-filter-item-label">Acción</span>
+              <span class="rep-filter-shell select-shell">
+                <select id="audit-action" class="rep-filter-input field-select">
+                  <option value="">Todas</option>
+                </select>
+              </span>
+            </div>
+            <div class="rep-filter-item" style="flex: 1.4 1 180px;">
+              <span class="rep-filter-item-label">Usuario</span>
+              <span class="rep-filter-shell select-shell">
+                <select id="audit-user" class="rep-filter-input field-select">
+                  <option value="">Todos</option>
+                </select>
+              </span>
+            </div>
+            <div class="rep-filter-item" style="flex: 2 1 220px;">
+              <span class="rep-filter-item-label">Buscar</span>
+              <span class="rep-filter-shell">
+                <input type="text" id="audit-search" class="rep-filter-input" placeholder="empleado, motivo, etc." />
+              </span>
+            </div>
+            <button type="button" id="audit-buscar" class="btn-primary rep-generate-btn">Filtrar</button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table audit-table">
+                <thead>
+                  <tr>
+                    <th style="width: 16%;">Fecha y hora</th>
+                    <th style="width: 15%;">Usuario</th>
+                    <th style="width: 18%;">Acción</th>
+                    <th>Entidad</th>
+                    <th style="width: 80px; text-align: right;"></th>
+                  </tr>
+                </thead>
+                <tbody id="audit-tbody">
+                  <tr class="users-empty-row"><td colspan="5">Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="audit-pager" class="audit-pager hidden">
+              <button type="button" id="audit-prev" class="rep-export-btn">Anterior</button>
+              <span id="audit-page-info" class="audit-page-info">—</span>
+              <button type="button" id="audit-next" class="rep-export-btn">Siguiente</button>
+            </div>
           </div>
         </section>
 
@@ -820,6 +997,60 @@
       <footer class="modal-foot">
         <button type="button" class="btn-ghost-outline" data-delmodal-close>Cancelar</button>
         <button type="submit" form="evt-del-form" id="evt-del-submit" class="btn-primary btn-primary--auto" style="background: var(--error);">Eliminar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Audit detail modal -->
+  <div id="audit-detail-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="audit-detail-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="audit-detail-title">Detalle</h2>
+        <button type="button" class="modal-close-btn" data-audmodal-close aria-label="Cerrar">
+          <span id="icon-audmodal-close"></span>
+        </button>
+      </header>
+      <div class="modal-body">
+        <div id="audit-detail-meta" class="audit-detail-meta"></div>
+        <div class="audit-detail-section">
+          <div class="settings-section-title">Datos</div>
+          <pre id="audit-detail-json" class="audit-detail-json">—</pre>
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-audmodal-close>Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Drill-down modal: Horas dentro/fuera por día -->
+  <div id="rep-hd-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="rep-hd-modal-title">
+    <div class="modal modal--wide">
+      <header class="modal-header">
+        <h2 class="modal-title" id="rep-hd-modal-title">Detalle por día</h2>
+        <button type="button" class="modal-close-btn" data-hdmodal-close aria-label="Cerrar">
+          <span id="icon-hdmodal-close"></span>
+        </button>
+      </header>
+      <div class="modal-body modal-body--scroll">
+        <div id="rep-hd-modal-summary" class="rep-summary rep-summary--cards" style="margin-bottom: 14px;"></div>
+        <div class="users-table-wrap">
+          <table class="users-table rep-hd-detail-table">
+            <thead>
+              <tr>
+                <th style="width: 22%;">Día</th>
+                <th style="width: 13%; text-align: right;">Dentro</th>
+                <th style="width: 13%; text-align: right;">Fuera</th>
+                <th style="width: 22%;">Cumplimiento</th>
+                <th>Eventos</th>
+              </tr>
+            </thead>
+            <tbody id="rep-hd-modal-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-hdmodal-close>Cerrar</button>
       </footer>
     </div>
   </div>
