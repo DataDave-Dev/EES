@@ -68,31 +68,95 @@ function computeDayStats(events, workStartSec, workEndSec, isToday, nowSec) {
 
 
 
+// ── Prepared statements (lazy init) ───────────────────────────
+let S = null;
+function stmts() {
+  if (S) return S;
+  const db = getDb();
+  const eventCols = `
+    e.id, e.timestamp, e.tipo, e.motivo_tipo, e.motivo_detalle,
+    emp.numero_empleado, emp.nombre AS emp_nombre, emp.apellidos AS emp_apellidos,
+    u.username AS registrado_por_username
+  `;
+  S = {
+    asistenciaDiaFecha: db.prepare(`
+      SELECT ${eventCols}
+      FROM registro_eventos e
+      JOIN empleados emp ON emp.id = e.empleado_id
+      JOIN users u       ON u.id   = e.registrado_por
+      WHERE date(e.timestamp, 'localtime') = ?
+      ORDER BY e.timestamp ASC
+    `),
+    asistenciaDiaHoy: db.prepare(`
+      SELECT ${eventCols}
+      FROM registro_eventos e
+      JOIN empleados emp ON emp.id = e.empleado_id
+      JOIN users u       ON u.id   = e.registrado_por
+      WHERE date(e.timestamp, 'localtime') = date('now', 'localtime')
+      ORDER BY e.timestamp ASC
+    `),
+    empleadoById: db.prepare('SELECT * FROM empleados WHERE id = ?'),
+    historialEventos: db.prepare(`
+      SELECT
+        e.id, e.timestamp, e.tipo, e.motivo_tipo, e.motivo_detalle,
+        u.username AS registrado_por_username
+      FROM registro_eventos e
+      JOIN users u ON u.id = e.registrado_por
+      WHERE e.empleado_id = ?
+        AND date(e.timestamp, 'localtime') BETWEEN ? AND ?
+      ORDER BY e.timestamp ASC
+    `),
+    salidasPorMotivoRango: db.prepare(`
+      SELECT
+        COALESCE(motivo_tipo, '(sin motivo)') AS motivo,
+        COUNT(*) AS total
+      FROM registro_eventos
+      WHERE tipo = 'salida'
+        AND date(timestamp, 'localtime') BETWEEN ? AND ?
+      GROUP BY motivo
+      ORDER BY total DESC, motivo ASC
+    `),
+    eventosRangoActivos: db.prepare(`
+      SELECT
+        e.empleado_id,
+        date(e.timestamp, 'localtime') AS local_date,
+        CAST(strftime('%H', e.timestamp, 'localtime') AS INTEGER) * 3600 +
+        CAST(strftime('%M', e.timestamp, 'localtime') AS INTEGER) * 60 +
+        CAST(strftime('%S', e.timestamp, 'localtime') AS INTEGER) AS local_sec,
+        e.tipo
+      FROM registro_eventos e
+      JOIN empleados emp ON emp.id = e.empleado_id
+      WHERE date(e.timestamp, 'localtime') BETWEEN ? AND ?
+        AND emp.estatus = 'activo'
+      ORDER BY e.empleado_id, e.timestamp ASC
+    `),
+    empleadosActivos: db.prepare(`
+      SELECT id, numero_empleado, nombre, apellidos
+      FROM empleados WHERE estatus = 'activo'
+      ORDER BY apellidos, nombre
+    `),
+    eventosEmpleadoRango: db.prepare(`
+      SELECT
+        date(timestamp, 'localtime') AS local_date,
+        CAST(strftime('%H', timestamp, 'localtime') AS INTEGER) * 3600 +
+        CAST(strftime('%M', timestamp, 'localtime') AS INTEGER) * 60 +
+        CAST(strftime('%S', timestamp, 'localtime') AS INTEGER) AS local_sec,
+        strftime('%H:%M', timestamp, 'localtime') AS local_hhmm,
+        tipo, motivo_tipo
+      FROM registro_eventos
+      WHERE empleado_id = ?
+        AND date(timestamp, 'localtime') BETWEEN ? AND ?
+      ORDER BY timestamp ASC
+    `),
+  };
+  return S;
+}
+
 // fecha: 'YYYY-MM-DD' (local). Si no se pasa, usa hoy local.
 function asistenciaDia(fecha) {
+  const s = stmts();
   const f = (fecha || '').trim();
-  const where = f
-    ? "date(e.timestamp, 'localtime') = ?"
-    : "date(e.timestamp, 'localtime') = date('now', 'localtime')";
-  const sql = `
-    SELECT
-      e.id,
-      e.timestamp,
-      e.tipo,
-      e.motivo_tipo,
-      e.motivo_detalle,
-      emp.numero_empleado,
-      emp.nombre        AS emp_nombre,
-      emp.apellidos     AS emp_apellidos,
-      u.username        AS registrado_por_username
-    FROM registro_eventos e
-    JOIN empleados emp ON emp.id = e.empleado_id
-    JOIN users u       ON u.id   = e.registrado_por
-    WHERE ${where}
-    ORDER BY e.timestamp ASC
-  `;
-  const stmt = getDb().prepare(sql);
-  return f ? stmt.all(f) : stmt.all();
+  return f ? s.asistenciaDiaFecha.all(f) : s.asistenciaDiaHoy.all();
 }
 
 function historialEmpleado(empleadoId, fechaIni, fechaFin) {
@@ -102,25 +166,11 @@ function historialEmpleado(empleadoId, fechaIni, fechaFin) {
   if (!ini || !fin) return { ok: false, error: 'Selecciona rango de fechas' };
   if (ini > fin) return { ok: false, error: 'La fecha inicial debe ser anterior o igual a la final' };
 
-  const emp = getDb().prepare('SELECT * FROM empleados WHERE id = ?').get(empleadoId);
+  const s = stmts();
+  const emp = s.empleadoById.get(empleadoId);
   if (!emp) return { ok: false, error: 'Empleado no encontrado' };
 
-  const eventos = getDb()
-    .prepare(`
-      SELECT
-        e.id,
-        e.timestamp,
-        e.tipo,
-        e.motivo_tipo,
-        e.motivo_detalle,
-        u.username AS registrado_por_username
-      FROM registro_eventos e
-      JOIN users u ON u.id = e.registrado_por
-      WHERE e.empleado_id = ?
-        AND date(e.timestamp, 'localtime') BETWEEN ? AND ?
-      ORDER BY e.timestamp ASC
-    `)
-    .all(empleadoId, ini, fin);
+  const eventos = s.historialEventos.all(empleadoId, ini, fin);
 
   // Días asistidos = días distintos con al menos una entrada
   const diasAsistidos = new Set(
@@ -151,18 +201,7 @@ function salidasPorMotivo(fechaIni, fechaFin) {
   if (!ini || !fin) return { ok: false, error: 'Selecciona rango de fechas' };
   if (ini > fin) return { ok: false, error: 'La fecha inicial debe ser anterior o igual a la final' };
 
-  const rows = getDb()
-    .prepare(`
-      SELECT
-        COALESCE(motivo_tipo, '(sin motivo)') AS motivo,
-        COUNT(*) AS total
-      FROM registro_eventos
-      WHERE tipo = 'salida'
-        AND date(timestamp, 'localtime') BETWEEN ? AND ?
-      GROUP BY motivo
-      ORDER BY total DESC, motivo ASC
-    `)
-    .all(ini, fin);
+  const rows = stmts().salidasPorMotivoRango.all(ini, fin);
 
   const total = rows.reduce((sum, r) => sum + r.total, 0);
   return { ok: true, rango: { ini, fin }, rows, total };
@@ -184,23 +223,8 @@ function horasDentroFuera(fechaIni, fechaFin) {
   const todayIso = todayLocalIso();
   const nowSec = nowLocalSec();
 
-  const db = getDb();
-
-  // All events in range, in local time, grouped later.
-  const rows = db.prepare(`
-    SELECT
-      e.empleado_id,
-      date(e.timestamp, 'localtime') AS local_date,
-      CAST(strftime('%H', e.timestamp, 'localtime') AS INTEGER) * 3600 +
-      CAST(strftime('%M', e.timestamp, 'localtime') AS INTEGER) * 60 +
-      CAST(strftime('%S', e.timestamp, 'localtime') AS INTEGER) AS local_sec,
-      e.tipo
-    FROM registro_eventos e
-    JOIN empleados emp ON emp.id = e.empleado_id
-    WHERE date(e.timestamp, 'localtime') BETWEEN ? AND ?
-      AND emp.estatus = 'activo'
-    ORDER BY e.empleado_id, e.timestamp ASC
-  `).all(ini, fin);
+  const s = stmts();
+  const rows = s.eventosRangoActivos.all(ini, fin);
 
   // group: empleado_id -> Map<date, events[]>
   const byEmp = new Map();
@@ -213,13 +237,8 @@ function horasDentroFuera(fechaIni, fechaFin) {
   }
 
   // Include all active empleados even with zero activity
-  const activos = db.prepare(`
-    SELECT id, numero_empleado, nombre, apellidos
-    FROM empleados WHERE estatus = 'activo'
-    ORDER BY apellidos, nombre
-  `).all();
+  const activos = s.empleadosActivos.all();
 
-  const workdayInSet = new Set(workdays);
   const result = activos.map((emp) => {
     const days = byEmp.get(emp.id) || new Map();
     let totalInside = 0;
@@ -275,7 +294,8 @@ function horasDentroFueraEmpleado(empleadoId, fechaIni, fechaFin) {
   if (!ini || !fin) return { ok: false, error: 'Selecciona rango de fechas' };
   if (ini > fin) return { ok: false, error: 'La fecha inicial debe ser anterior o igual a la final' };
 
-  const emp = getDb().prepare('SELECT * FROM empleados WHERE id = ?').get(empleadoId);
+  const s = stmts();
+  const emp = s.empleadoById.get(empleadoId);
   if (!emp) return { ok: false, error: 'Empleado no encontrado' };
 
   const schedule = configLib.getWorkSchedule();
@@ -286,19 +306,7 @@ function horasDentroFueraEmpleado(empleadoId, fechaIni, fechaFin) {
   const todayIso = todayLocalIso();
   const nowSec = nowLocalSec();
 
-  const rows = getDb().prepare(`
-    SELECT
-      date(timestamp, 'localtime') AS local_date,
-      CAST(strftime('%H', timestamp, 'localtime') AS INTEGER) * 3600 +
-      CAST(strftime('%M', timestamp, 'localtime') AS INTEGER) * 60 +
-      CAST(strftime('%S', timestamp, 'localtime') AS INTEGER) AS local_sec,
-      strftime('%H:%M', timestamp, 'localtime') AS local_hhmm,
-      tipo, motivo_tipo
-    FROM registro_eventos
-    WHERE empleado_id = ?
-      AND date(timestamp, 'localtime') BETWEEN ? AND ?
-    ORDER BY timestamp ASC
-  `).all(empleadoId, ini, fin);
+  const rows = s.eventosEmpleadoRango.all(empleadoId, ini, fin);
 
   const byDate = new Map();
   for (const r of rows) {

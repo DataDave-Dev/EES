@@ -2,17 +2,50 @@ const { getDb } = require('./db');
 const empleados = require('./empleados');
 const catalogos = require('./catalogos');
 
-function getLastEventToday(empleadoId) {
-  return getDb()
-    .prepare(`
+let S = null;
+function stmts() {
+  if (S) return S;
+  const db = getDb();
+  S = {
+    lastEventToday: db.prepare(`
       SELECT id, empleado_id, tipo, timestamp, registrado_por, motivo_tipo, motivo_detalle
       FROM registro_eventos
       WHERE empleado_id = ?
         AND date(timestamp, 'localtime') = date('now', 'localtime')
       ORDER BY timestamp DESC
       LIMIT 1
-    `)
-    .get(empleadoId) || null;
+    `),
+    insert: db.prepare(`
+      INSERT INTO registro_eventos (empleado_id, tipo, registrado_por, motivo_tipo, motivo_detalle)
+      VALUES (?, ?, ?, ?, ?)
+    `),
+    findById: db.prepare(`
+      SELECT id, empleado_id, tipo, timestamp, registrado_por, motivo_tipo, motivo_detalle
+      FROM registro_eventos WHERE id = ?
+    `),
+    listToday: db.prepare(`
+      SELECT
+        e.id, e.tipo, e.timestamp, e.empleado_id, e.motivo_tipo, e.motivo_detalle,
+        emp.numero_empleado, emp.nombre AS emp_nombre, emp.apellidos AS emp_apellidos,
+        u.username AS registrado_por_username
+      FROM registro_eventos e
+      JOIN empleados emp ON emp.id = e.empleado_id
+      JOIN users u       ON u.id   = e.registrado_por
+      WHERE date(e.timestamp, 'localtime') = date('now', 'localtime')
+      ORDER BY e.timestamp DESC
+    `),
+    update: db.prepare(`
+      UPDATE registro_eventos
+      SET tipo = ?, timestamp = ?, motivo_tipo = ?, motivo_detalle = ?
+      WHERE id = ?
+    `),
+    delete: db.prepare('DELETE FROM registro_eventos WHERE id = ?'),
+  };
+  return S;
+}
+
+function getLastEventToday(empleadoId) {
+  return stmts().lastEventToday.get(empleadoId) || null;
 }
 
 function getEmpleadoStatus(empleadoId) {
@@ -59,53 +92,19 @@ function markEvent(empleadoId, registradoPorId, tipo, motivoInfo) {
   }
   if (d) motivoDetalle = d;
 
-  const info = getDb()
-    .prepare(`
-      INSERT INTO registro_eventos (empleado_id, tipo, registrado_por, motivo_tipo, motivo_detalle)
-      VALUES (?, ?, ?, ?, ?)
-    `)
-    .run(emp.id, resolvedTipo, registradoPorId, motivoTipo, motivoDetalle);
-
-  const evento = getDb()
-    .prepare(`
-      SELECT id, empleado_id, tipo, timestamp, registrado_por, motivo_tipo, motivo_detalle
-      FROM registro_eventos WHERE id = ?
-    `)
-    .get(info.lastInsertRowid);
+  const s = stmts();
+  const info = s.insert.run(emp.id, resolvedTipo, registradoPorId, motivoTipo, motivoDetalle);
+  const evento = s.findById.get(info.lastInsertRowid);
 
   return { ok: true, evento, empleado: empleados.publicEmpleado(emp) };
 }
 
 function listTodayEvents() {
-  return getDb()
-    .prepare(`
-      SELECT
-        e.id,
-        e.tipo,
-        e.timestamp,
-        e.empleado_id,
-        e.motivo_tipo,
-        e.motivo_detalle,
-        emp.numero_empleado,
-        emp.nombre        AS emp_nombre,
-        emp.apellidos     AS emp_apellidos,
-        u.username        AS registrado_por_username
-      FROM registro_eventos e
-      JOIN empleados emp ON emp.id = e.empleado_id
-      JOIN users u       ON u.id   = e.registrado_por
-      WHERE date(e.timestamp, 'localtime') = date('now', 'localtime')
-      ORDER BY e.timestamp DESC
-    `)
-    .all();
+  return stmts().listToday.all();
 }
 
 function findEventById(id) {
-  return getDb()
-    .prepare(`
-      SELECT id, empleado_id, tipo, timestamp, registrado_por, motivo_tipo, motivo_detalle
-      FROM registro_eventos WHERE id = ?
-    `)
-    .get(id) || null;
+  return stmts().findById.get(id) || null;
 }
 
 // Acepta { tipo, timestamp, motivoTipo, motivoDetalle }.
@@ -138,13 +137,7 @@ function updateEvent(id, { tipo, timestamp, motivoTipo, motivoDetalle } = {}) {
   }
   if (d) finalMotivoDetalle = d;
 
-  getDb()
-    .prepare(`
-      UPDATE registro_eventos
-      SET tipo = ?, timestamp = ?, motivo_tipo = ?, motivo_detalle = ?
-      WHERE id = ?
-    `)
-    .run(newTipo, normalizedTs, finalMotivoTipo, finalMotivoDetalle, target.id);
+  stmts().update.run(newTipo, normalizedTs, finalMotivoTipo, finalMotivoDetalle, target.id);
 
   return { ok: true, evento: findEventById(target.id) };
 }
@@ -152,7 +145,7 @@ function updateEvent(id, { tipo, timestamp, motivoTipo, motivoDetalle } = {}) {
 function deleteEvent(id) {
   const target = findEventById(id);
   if (!target) return { ok: false, error: 'Registro no encontrado' };
-  getDb().prepare('DELETE FROM registro_eventos WHERE id = ?').run(target.id);
+  stmts().delete.run(target.id);
   return { ok: true };
 }
 

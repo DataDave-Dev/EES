@@ -1,5 +1,43 @@
 const { getDb } = require('./db');
 
+let S = null;
+function stmts() {
+  if (S) return S;
+  const db = getDb();
+  S = {
+    findById: db.prepare('SELECT * FROM empleados WHERE id = ?'),
+    findByNumero: db.prepare('SELECT * FROM empleados WHERE numero_empleado = ?'),
+    listNumeros: db.prepare('SELECT numero_empleado FROM empleados'),
+    listAll: db.prepare(`
+      SELECT * FROM empleados
+      ORDER BY estatus ASC, numero_empleado ASC
+    `),
+    searchActive: db.prepare(`
+      SELECT * FROM empleados
+      WHERE estatus = 'activo'
+        AND (
+          numero_empleado LIKE ?
+          OR (nombre || ' ' || apellidos) LIKE ?
+          OR nombre LIKE ?
+          OR apellidos LIKE ?
+        )
+      ORDER BY numero_empleado ASC
+      LIMIT ?
+    `),
+    insert: db.prepare(`
+      INSERT INTO empleados (numero_empleado, nombre, apellidos, puesto, departamento, estatus)
+      VALUES (?, ?, ?, ?, ?, 'activo')
+    `),
+    update: db.prepare(`
+      UPDATE empleados
+      SET numero_empleado = ?, nombre = ?, apellidos = ?, puesto = ?, departamento = ?
+      WHERE id = ?
+    `),
+    updateEstatus: db.prepare('UPDATE empleados SET estatus = ? WHERE id = ?'),
+  };
+  return S;
+}
+
 function normalize(s) {
   return String(s ?? '').trim();
 }
@@ -15,15 +53,15 @@ function validateNumero(numero) {
 }
 
 function findById(id) {
-  return getDb().prepare('SELECT * FROM empleados WHERE id = ?').get(id);
+  return stmts().findById.get(id);
 }
 
 function findByNumero(numero) {
-  return getDb().prepare('SELECT * FROM empleados WHERE numero_empleado = ?').get(numero);
+  return stmts().findByNumero.get(numero);
 }
 
 function nextNumeroEmpleado() {
-  const rows = getDb().prepare('SELECT numero_empleado FROM empleados').all();
+  const rows = stmts().listNumeros.all();
   let max = 0;
   for (const r of rows) {
     const v = String(r.numero_empleado);
@@ -51,34 +89,14 @@ function publicEmpleado(row) {
 }
 
 function listEmpleados() {
-  const rows = getDb()
-    .prepare(`
-      SELECT * FROM empleados
-      ORDER BY estatus ASC, numero_empleado ASC
-    `)
-    .all();
-  return rows.map(publicEmpleado);
+  return stmts().listAll.all().map(publicEmpleado);
 }
 
 function searchActiveEmpleados(query, limit = 8) {
   const q = normalize(query);
   if (!q) return [];
   const like = `%${q}%`;
-  const rows = getDb()
-    .prepare(`
-      SELECT * FROM empleados
-      WHERE estatus = 'activo'
-        AND (
-          numero_empleado LIKE ?
-          OR (nombre || ' ' || apellidos) LIKE ?
-          OR nombre LIKE ?
-          OR apellidos LIKE ?
-        )
-      ORDER BY numero_empleado ASC
-      LIMIT ?
-    `)
-    .all(like, like, like, like, limit);
-  return rows.map(publicEmpleado);
+  return stmts().searchActive.all(like, like, like, like, limit).map(publicEmpleado);
 }
 
 function createEmpleado({ numero_empleado, nombre, apellidos, puesto, departamento }) {
@@ -98,12 +116,7 @@ function createEmpleado({ numero_empleado, nombre, apellidos, puesto, departamen
     return { ok: false, error: 'Ese número de empleado ya está en uso' };
   }
 
-  const info = getDb()
-    .prepare(`
-      INSERT INTO empleados (numero_empleado, nombre, apellidos, puesto, departamento, estatus)
-      VALUES (?, ?, ?, ?, ?, 'activo')
-    `)
-    .run(numero, nom, ape, pue, dep);
+  const info = stmts().insert.run(numero, nom, ape, pue, dep);
 
   return { ok: true, empleado: publicEmpleado(findById(info.lastInsertRowid)) };
 }
@@ -131,13 +144,7 @@ function updateEmpleado(id, { numero_empleado, nombre, apellidos, puesto, depart
     }
   }
 
-  getDb()
-    .prepare(`
-      UPDATE empleados
-      SET numero_empleado = ?, nombre = ?, apellidos = ?, puesto = ?, departamento = ?
-      WHERE id = ?
-    `)
-    .run(numero, nom, ape, pue, dep, target.id);
+  stmts().update.run(numero, nom, ape, pue, dep, target.id);
 
   return { ok: true, empleado: publicEmpleado(findById(target.id)) };
 }
@@ -149,7 +156,7 @@ function setEmpleadoEstatus(id, estatus) {
   const target = findById(id);
   if (!target) return { ok: false, error: 'Empleado no encontrado' };
 
-  getDb().prepare('UPDATE empleados SET estatus = ? WHERE id = ?').run(estatus, target.id);
+  stmts().updateEstatus.run(estatus, target.id);
   return { ok: true, empleado: publicEmpleado(findById(target.id)) };
 }
 

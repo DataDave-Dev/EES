@@ -4,6 +4,34 @@ const { getDb } = require('./db');
 // invente nombres arbitrarios de catálogo.
 const KNOWN_CATALOGOS = new Set(['motivos']);
 
+let S = null;
+function stmts() {
+  if (S) return S;
+  const db = getDb();
+  S = {
+    listActive: db.prepare(`
+      SELECT id, valor, estatus, orden FROM catalogo_items
+      WHERE catalogo = ? AND estatus = 'activo'
+      ORDER BY orden ASC, valor ASC
+    `),
+    listAll: db.prepare(`
+      SELECT id, valor, estatus, orden FROM catalogo_items
+      WHERE catalogo = ?
+      ORDER BY orden ASC, valor ASC
+    `),
+    findByValor: db.prepare('SELECT * FROM catalogo_items WHERE catalogo = ? AND valor = ?'),
+    findById: db.prepare('SELECT * FROM catalogo_items WHERE id = ?'),
+    reactivate: db.prepare("UPDATE catalogo_items SET estatus = 'activo' WHERE id = ?"),
+    maxOrden: db.prepare('SELECT COALESCE(MAX(orden), -1) AS m FROM catalogo_items WHERE catalogo = ?'),
+    insert: db.prepare('INSERT INTO catalogo_items (catalogo, valor, orden) VALUES (?, ?, ?)'),
+    selectAfterInsert: db.prepare('SELECT id, valor, estatus, orden FROM catalogo_items WHERE id = ?'),
+    updateValor: db.prepare('UPDATE catalogo_items SET valor = ? WHERE id = ?'),
+    updateEstatus: db.prepare('UPDATE catalogo_items SET estatus = ? WHERE id = ?'),
+    delete: db.prepare('DELETE FROM catalogo_items WHERE id = ?'),
+  };
+  return S;
+}
+
 function normalize(s) {
   return String(s ?? '').trim();
 }
@@ -16,23 +44,14 @@ function assertCatalogo(catalogo) {
 }
 
 function listItems(catalogo, { activeOnly = true } = {}) {
-  const err = assertCatalogo(catalogo);
-  if (err) return [];
-  const sql = activeOnly
-    ? `SELECT id, valor, estatus, orden FROM catalogo_items
-       WHERE catalogo = ? AND estatus = 'activo'
-       ORDER BY orden ASC, valor ASC`
-    : `SELECT id, valor, estatus, orden FROM catalogo_items
-       WHERE catalogo = ?
-       ORDER BY orden ASC, valor ASC`;
-  return getDb().prepare(sql).all(catalogo);
+  if (assertCatalogo(catalogo)) return [];
+  const s = stmts();
+  return (activeOnly ? s.listActive : s.listAll).all(catalogo);
 }
 
 function findItem(catalogo, valor) {
   if (assertCatalogo(catalogo)) return null;
-  return getDb()
-    .prepare('SELECT * FROM catalogo_items WHERE catalogo = ? AND valor = ?')
-    .get(catalogo, normalize(valor)) || null;
+  return stmts().findByValor.get(catalogo, normalize(valor)) || null;
 }
 
 function isActiveValue(catalogo, valor) {
@@ -48,35 +67,26 @@ function addItem(catalogo, valor) {
   if (!v) return { ok: false, error: 'El nombre es obligatorio' };
   if (v.length > 64) return { ok: false, error: 'Nombre demasiado largo (máx 64)' };
 
+  const s = stmts();
   // Reactivate if it exists but is inactive.
   const existing = findItem(catalogo, v);
   if (existing) {
     if (existing.estatus === 'activo') {
       return { ok: false, error: 'Ese valor ya existe' };
     }
-    getDb()
-      .prepare("UPDATE catalogo_items SET estatus = 'activo' WHERE id = ?")
-      .run(existing.id);
+    s.reactivate.run(existing.id);
     return { ok: true, item: { ...existing, estatus: 'activo' } };
   }
 
   // New item: append at the end of order.
-  const maxOrden = getDb()
-    .prepare('SELECT COALESCE(MAX(orden), -1) AS m FROM catalogo_items WHERE catalogo = ?')
-    .get(catalogo).m;
-
-  const info = getDb()
-    .prepare('INSERT INTO catalogo_items (catalogo, valor, orden) VALUES (?, ?, ?)')
-    .run(catalogo, v, maxOrden + 1);
-
-  const item = getDb()
-    .prepare('SELECT id, valor, estatus, orden FROM catalogo_items WHERE id = ?')
-    .get(info.lastInsertRowid);
+  const maxOrden = s.maxOrden.get(catalogo).m;
+  const info = s.insert.run(catalogo, v, maxOrden + 1);
+  const item = s.selectAfterInsert.get(info.lastInsertRowid);
   return { ok: true, item };
 }
 
 function findItemById(id) {
-  return getDb().prepare('SELECT * FROM catalogo_items WHERE id = ?').get(id) || null;
+  return stmts().findById.get(id) || null;
 }
 
 function updateItem(id, valor) {
@@ -94,7 +104,7 @@ function updateItem(id, valor) {
     }
   }
 
-  getDb().prepare('UPDATE catalogo_items SET valor = ? WHERE id = ?').run(v, target.id);
+  stmts().updateValor.run(v, target.id);
   return { ok: true, item: findItemById(target.id) };
 }
 
@@ -105,9 +115,7 @@ function setItemEstatus(id, estatus) {
   const target = findItemById(id);
   if (!target) return { ok: false, error: 'Elemento no encontrado' };
 
-  getDb()
-    .prepare('UPDATE catalogo_items SET estatus = ? WHERE id = ?')
-    .run(estatus, target.id);
+  stmts().updateEstatus.run(estatus, target.id);
   return { ok: true, item: findItemById(target.id) };
 }
 
@@ -116,7 +124,7 @@ function deleteItem(id) {
   if (!target) return { ok: false, error: 'Elemento no encontrado' };
   // Hard delete. Historical references (e.g. registro_eventos.salida_tipo) store
   // the literal text value, not an FK, so deleting doesn't break audit history.
-  getDb().prepare('DELETE FROM catalogo_items WHERE id = ?').run(target.id);
+  stmts().delete.run(target.id);
   return { ok: true };
 }
 

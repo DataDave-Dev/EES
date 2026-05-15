@@ -370,11 +370,33 @@ function renderDashboard(stats) {
         </div>
       </button>
     `).join('');
-    dashPresentes.querySelectorAll('[data-empleado-id]').forEach((btn) => {
-      btn.addEventListener('click', () => navigateToHistorial(+btn.dataset.empleadoId));
-    });
+    // Listener is delegated once below (see dashPresentes.addEventListener),
+    // so no per-element wiring needed here.
   }
 }
+// Delegated click handler: attached once, survives every re-render.
+dashPresentes.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-empleado-id]');
+  if (btn && dashPresentes.contains(btn)) {
+    navigateToHistorial(+btn.dataset.empleadoId);
+  }
+});
+
+// Delegated legend toggle (entradas/salidas): attached once.
+dashHourlyLegend.addEventListener('click', (e) => {
+  const btn = e.target.closest('.chart-legend-pill');
+  if (!btn) return;
+  const idx = +btn.dataset.index;
+  if (!Number.isFinite(idx)) return;
+  const seriesCount = dashState.seriesCount || 2;
+  if (dashState.hiddenSeries.has(idx)) {
+    dashState.hiddenSeries.delete(idx);
+  } else {
+    if (dashState.hiddenSeries.size >= seriesCount - 1) return;
+    dashState.hiddenSeries.add(idx);
+  }
+  renderActivityChart();
+});
 
 // ── Render: actividad chart (line) ────────────────────────────
 function renderActivityChart() {
@@ -395,21 +417,8 @@ function renderActivityChart() {
   const xLabels = buckets.map((b) => b.shortLabel || '');
   dashHourly.innerHTML = lineSVG(seriesForSvg, { xLabels, hidden: dashState.hiddenSeries });
   dashHourlyLegend.innerHTML = chartLegendInline(seriesForSvg, dashState.hiddenSeries);
-
-  // Wire legend toggle
-  dashHourlyLegend.querySelectorAll('.chart-legend-pill').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const idx = +btn.dataset.index;
-      if (dashState.hiddenSeries.has(idx)) {
-        dashState.hiddenSeries.delete(idx);
-      } else {
-        // Prevent hiding all
-        if (dashState.hiddenSeries.size >= seriesForSvg.length - 1) return;
-        dashState.hiddenSeries.add(idx);
-      }
-      renderActivityChart();
-    });
-  });
+  // Series count is needed by the delegated legend click handler.
+  dashState.seriesCount = seriesForSvg.length;
 
   // Wire tooltip on hover bands
   const svg = dashHourly.querySelector('svg');
@@ -561,7 +570,9 @@ async function loadDashboardStats() {
 function startDashboardAutoRefresh() {
   stopDashboardAutoRefresh();
   loadDashboardStats();
-  dashRefreshInterval = setInterval(loadDashboardStats, 60000);
+  // 5 min: el botón 'Actualizar' del header está disponible para refresh
+  // inmediato; el auto solo cubre el caso de tener la vista abierta pasivamente.
+  dashRefreshInterval = setInterval(loadDashboardStats, 300000);
 }
 function stopDashboardAutoRefresh() {
   if (dashRefreshInterval) { clearInterval(dashRefreshInterval); dashRefreshInterval = null; }

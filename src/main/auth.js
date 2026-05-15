@@ -15,6 +15,42 @@ const BCRYPT_COST = 12;
 
 let currentUser = null;
 
+// ── Prepared statements (lazy init) ───────────────────────────
+let S = null;
+function stmts() {
+  if (S) return S;
+  const db = getDb();
+  S = {
+    countUsers: db.prepare('SELECT COUNT(*) AS c FROM users'),
+    findByUsername: db.prepare('SELECT * FROM users WHERE username = ?'),
+    findById: db.prepare('SELECT * FROM users WHERE id = ?'),
+    listPermissions: db.prepare('SELECT permission FROM user_permissions WHERE user_id = ?'),
+    hasPermission: db.prepare('SELECT 1 FROM user_permissions WHERE user_id = ? AND permission = ? LIMIT 1'),
+    listUsers: db.prepare(`
+      SELECT u.id, u.username, u.nombre, u.apellidos, u.estatus,
+             u.fecha_creacion, u.fecha_modificacion, u.fecha_ultima_conexion,
+             COALESCE(GROUP_CONCAT(p.permission, ','), '') AS perm_csv
+      FROM users u
+      LEFT JOIN user_permissions p ON p.user_id = u.id
+      GROUP BY u.id
+      ORDER BY u.fecha_creacion DESC
+    `),
+    insertUser: db.prepare(`
+      INSERT INTO users (username, password_hash, nombre, apellidos, estatus)
+      VALUES (?, ?, ?, ?, 'activo')
+    `),
+    insertPerm: db.prepare('INSERT OR IGNORE INTO user_permissions (user_id, permission) VALUES (?, ?)'),
+    deletePermsForUser: db.prepare('DELETE FROM user_permissions WHERE user_id = ?'),
+    insertPermStrict: db.prepare('INSERT INTO user_permissions (user_id, permission) VALUES (?, ?)'),
+    updateLastConn: db.prepare("UPDATE users SET fecha_ultima_conexion = datetime('now') WHERE id = ?"),
+    updateBasic: db.prepare('UPDATE users SET username = ?, nombre = ?, apellidos = ? WHERE id = ?'),
+    updateWithPassword: db.prepare('UPDATE users SET username = ?, nombre = ?, apellidos = ?, password_hash = ? WHERE id = ?'),
+    updateSettings: db.prepare('UPDATE users SET theme = ?, accent = ? WHERE id = ?'),
+    updateEstatus: db.prepare('UPDATE users SET estatus = ? WHERE id = ?'),
+  };
+  return S;
+}
+
 function lastUserPath() {
   const dir = app.isPackaged
     ? app.getPath('userData')
@@ -48,30 +84,23 @@ function saveLastUser(username) {
 }
 
 function countUsers() {
-  const row = getDb().prepare('SELECT COUNT(*) AS c FROM users').get();
-  return row.c;
+  return stmts().countUsers.get().c;
 }
 
 function findUserByUsername(username) {
-  return getDb().prepare('SELECT * FROM users WHERE username = ?').get(username);
+  return stmts().findByUsername.get(username);
 }
 
 function findUserById(id) {
-  return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id);
+  return stmts().findById.get(id);
 }
 
 function getUserPermissions(userId) {
-  const rows = getDb()
-    .prepare('SELECT permission FROM user_permissions WHERE user_id = ?')
-    .all(userId);
-  return rows.map((r) => r.permission);
+  return stmts().listPermissions.all(userId).map((r) => r.permission);
 }
 
 function hasPermission(userId, perm) {
-  const row = getDb()
-    .prepare('SELECT 1 FROM user_permissions WHERE user_id = ? AND permission = ? LIMIT 1')
-    .get(userId, perm);
-  return !!row;
+  return !!stmts().hasPermission.get(userId, perm);
 }
 
 function publicUser(row) {
@@ -103,18 +132,12 @@ async function createInitialUser({ nombre, apellidos, username, password }) {
 
   const hash = await bcrypt.hash(password, BCRYPT_COST);
 
-  const stmt = getDb().prepare(`
-    INSERT INTO users (username, password_hash, nombre, apellidos, estatus)
-    VALUES (?, ?, ?, ?, 'activo')
-  `);
-  const info = stmt.run(username.trim(), hash, nombre.trim(), apellidos.trim());
+  const s = stmts();
+  const info = s.insertUser.run(username.trim(), hash, nombre.trim(), apellidos.trim());
 
   // First admin: seed with full module access.
-  const insertPerm = getDb().prepare(
-    'INSERT OR IGNORE INTO user_permissions (user_id, permission) VALUES (?, ?)'
-  );
   const seed = getDb().transaction(() => {
-    for (const perm of ALL_MODULES) insertPerm.run(info.lastInsertRowid, perm);
+    for (const perm of ALL_MODULES) s.insertPerm.run(info.lastInsertRowid, perm);
   });
   seed();
 
@@ -137,9 +160,7 @@ async function login(username, password) {
     return { ok: false, error: 'Usuario inactivo' };
   }
 
-  getDb()
-    .prepare("UPDATE users SET fecha_ultima_conexion = datetime('now') WHERE id = ?")
-    .run(row.id);
+  stmts().updateLastConn.run(row.id);
 
   const fresh = findUserById(row.id);
   currentUser = publicUser(fresh);
@@ -171,17 +192,7 @@ function hasUsers() {
 }
 
 function listUsers() {
-  const rows = getDb()
-    .prepare(`
-      SELECT u.id, u.username, u.nombre, u.apellidos, u.estatus,
-             u.fecha_creacion, u.fecha_modificacion, u.fecha_ultima_conexion,
-             COALESCE(GROUP_CONCAT(p.permission, ','), '') AS perm_csv
-      FROM users u
-      LEFT JOIN user_permissions p ON p.user_id = u.id
-      GROUP BY u.id
-      ORDER BY u.fecha_creacion DESC
-    `)
-    .all();
+  const rows = stmts().listUsers.all();
   return rows.map(({ perm_csv, ...rest }) => ({
     ...rest,
     permissions: perm_csv ? perm_csv.split(',').filter(Boolean) : [],
@@ -200,13 +211,10 @@ function setUserPermissions(userId, permissions) {
     return { ok: false, error: 'No puedes quitarte el permiso de Accesos' };
   }
 
-  const db = getDb();
-  const replace = db.transaction(() => {
-    db.prepare('DELETE FROM user_permissions WHERE user_id = ?').run(target.id);
-    const ins = db.prepare(
-      'INSERT INTO user_permissions (user_id, permission) VALUES (?, ?)'
-    );
-    for (const perm of valid) ins.run(target.id, perm);
+  const s = stmts();
+  const replace = getDb().transaction(() => {
+    s.deletePermsForUser.run(target.id);
+    for (const perm of valid) s.insertPermStrict.run(target.id, perm);
   });
   replace();
 
@@ -253,12 +261,7 @@ async function createUser({ nombre, apellidos, username, password }) {
   }
 
   const hash = await bcrypt.hash(password, BCRYPT_COST);
-  const info = getDb()
-    .prepare(`
-      INSERT INTO users (username, password_hash, nombre, apellidos, estatus)
-      VALUES (?, ?, ?, ?, 'activo')
-    `)
-    .run(usr, hash, nom, ape);
+  const info = stmts().insertUser.run(usr, hash, nom, ape);
 
   return { ok: true, user: publicUser(findUserById(info.lastInsertRowid)) };
 }
@@ -289,17 +292,14 @@ async function updateUser(id, { nombre, apellidos, username, password }) {
     }
   }
 
+  const s = stmts();
   if (password) {
     const pwErr = validatePassword(password);
     if (pwErr) return { ok: false, error: pwErr };
     const hash = await bcrypt.hash(password, BCRYPT_COST);
-    getDb()
-      .prepare('UPDATE users SET username = ?, nombre = ?, apellidos = ?, password_hash = ? WHERE id = ?')
-      .run(usr, nom, ape, hash, target.id);
+    s.updateWithPassword.run(usr, nom, ape, hash, target.id);
   } else {
-    getDb()
-      .prepare('UPDATE users SET username = ?, nombre = ?, apellidos = ? WHERE id = ?')
-      .run(usr, nom, ape, target.id);
+    s.updateBasic.run(usr, nom, ape, target.id);
   }
 
   const fresh = findUserById(target.id);
@@ -325,9 +325,7 @@ function setUserSettings({ theme, accent } = {}) {
     return { ok: false, error: 'Color de acento inválido' };
   }
 
-  getDb()
-    .prepare('UPDATE users SET theme = ?, accent = ? WHERE id = ?')
-    .run(nextTheme, nextAccent, target.id);
+  stmts().updateSettings.run(nextTheme, nextAccent, target.id);
 
   currentUser = publicUser(findUserById(target.id));
   return { ok: true, user: currentUser };
@@ -344,7 +342,7 @@ function setUserEstatus(id, estatus) {
     return { ok: false, error: 'No puedes inactivar tu propia cuenta' };
   }
 
-  getDb().prepare('UPDATE users SET estatus = ? WHERE id = ?').run(estatus, target.id);
+  stmts().updateEstatus.run(estatus, target.id);
   return { ok: true, user: publicUser(findUserById(target.id)) };
 }
 

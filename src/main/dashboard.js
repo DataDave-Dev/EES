@@ -17,44 +17,30 @@ function isoDateOffset(offsetDays) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function getStats(rangeRaw) {
+// ── Prepared statements (lazy init) ───────────────────────────
+// better-sqlite3 prepare() compiles + caches plan; doing it once per module
+// avoids JIT/compile work on every dashboard refresh.
+let S = null;
+function stmts() {
+  if (S) return S;
   const db = getDb();
-  const range = normalizeRange(rangeRaw);
-  const days = RANGES[range].days;
-  const finIso = isoDateOffset(0);
-  const iniIso = isoDateOffset(-(days - 1));
-
-  // ── KPIs (always today) ──────────────────────────────
-  const empleadosActivos = db
-    .prepare("SELECT COUNT(*) AS c FROM empleados WHERE estatus = 'activo'")
-    .get().c;
-
-  const eventosHoy = db
-    .prepare(`
+  S = {
+    empleadosActivos: db.prepare("SELECT COUNT(*) AS c FROM empleados WHERE estatus = 'activo'"),
+    eventosHoy: db.prepare(`
       SELECT COUNT(*) AS c FROM registro_eventos
       WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-    `)
-    .get().c;
-
-  const entradasHoy = db
-    .prepare(`
+    `),
+    entradasHoy: db.prepare(`
       SELECT COUNT(*) AS c FROM registro_eventos
       WHERE tipo = 'entrada'
         AND date(timestamp, 'localtime') = date('now', 'localtime')
-    `)
-    .get().c;
-
-  const salidasHoy = db
-    .prepare(`
+    `),
+    salidasHoy: db.prepare(`
       SELECT COUNT(*) AS c FROM registro_eventos
       WHERE tipo = 'salida'
         AND date(timestamp, 'localtime') = date('now', 'localtime')
-    `)
-    .get().c;
-
-  // ── Empleados presentes ahora (siempre hoy) ──────────
-  const presentes = db
-    .prepare(`
+    `),
+    presentes: db.prepare(`
       WITH last_today AS (
         SELECT empleado_id, MAX(timestamp) AS ultimo_ts
         FROM registro_eventos
@@ -76,12 +62,8 @@ function getStats(rangeRaw) {
       JOIN empleados emp ON emp.id = lt.empleado_id
       WHERE ev.tipo = 'entrada' AND emp.estatus = 'activo'
       ORDER BY lt.ultimo_ts DESC
-    `)
-    .all();
-
-  // ── Actividad reciente (siempre últimos 8 eventos hoy) ───
-  const actividad = db
-    .prepare(`
+    `),
+    actividadHoy: db.prepare(`
       SELECT
         e.id, e.tipo, e.timestamp, e.motivo_tipo, e.motivo_detalle,
         emp.numero_empleado, emp.nombre AS emp_nombre, emp.apellidos AS emp_apellidos
@@ -90,12 +72,8 @@ function getStats(rangeRaw) {
       WHERE date(e.timestamp, 'localtime') = date('now', 'localtime')
       ORDER BY e.timestamp DESC
       LIMIT 8
-    `)
-    .all();
-
-  // ── Salidas por motivo (según rango) ─────────────────
-  const motivos = db
-    .prepare(`
+    `),
+    motivosRango: db.prepare(`
       SELECT
         COALESCE(motivo_tipo, '(sin motivo)') AS motivo,
         COUNT(*) AS total
@@ -105,25 +83,47 @@ function getStats(rangeRaw) {
       GROUP BY motivo
       ORDER BY total DESC
       LIMIT 8
-    `)
-    .all(iniIso, finIso);
+    `),
+    horasHoy: db.prepare(`
+      SELECT
+        CAST(strftime('%H', timestamp, 'localtime') AS INTEGER) AS bucket,
+        tipo,
+        COUNT(*) AS total
+      FROM registro_eventos
+      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+      GROUP BY bucket, tipo
+    `),
+    diasRango: db.prepare(`
+      SELECT
+        date(timestamp, 'localtime') AS bucket,
+        tipo,
+        COUNT(*) AS total
+      FROM registro_eventos
+      WHERE date(timestamp, 'localtime') BETWEEN ? AND ?
+      GROUP BY bucket, tipo
+    `),
+  };
+  return S;
+}
 
-  // ── Actividad: buckets según rango ───────────────────
-  // - 'today': 24 horas
-  // - '7d' / '30d': N días
+function getStats(rangeRaw) {
+  const s = stmts();
+  const range = normalizeRange(rangeRaw);
+  const days = RANGES[range].days;
+  const finIso = isoDateOffset(0);
+  const iniIso = isoDateOffset(-(days - 1));
+
+  const empleadosActivos = s.empleadosActivos.get().c;
+  const eventosHoy       = s.eventosHoy.get().c;
+  const entradasHoy      = s.entradasHoy.get().c;
+  const salidasHoy       = s.salidasHoy.get().c;
+  const presentes        = s.presentes.all();
+  const actividad        = s.actividadHoy.all();
+  const motivos          = s.motivosRango.all(iniIso, finIso);
+
   let actividadSerie;
   if (range === 'today') {
-    const horasRows = db
-      .prepare(`
-        SELECT
-          CAST(strftime('%H', timestamp, 'localtime') AS INTEGER) AS bucket,
-          tipo,
-          COUNT(*) AS total
-        FROM registro_eventos
-        WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-        GROUP BY bucket, tipo
-      `)
-      .all();
+    const horasRows = s.horasHoy.all();
     const buckets = Array.from({ length: 24 }, (_, h) => ({
       key: String(h).padStart(2, '0'),
       label: `${String(h).padStart(2, '0')}:00`,
@@ -138,18 +138,7 @@ function getStats(rangeRaw) {
     }
     actividadSerie = { kind: 'hourly', buckets };
   } else {
-    const diasRows = db
-      .prepare(`
-        SELECT
-          date(timestamp, 'localtime') AS bucket,
-          tipo,
-          COUNT(*) AS total
-        FROM registro_eventos
-        WHERE date(timestamp, 'localtime') BETWEEN ? AND ?
-        GROUP BY bucket, tipo
-      `)
-      .all(iniIso, finIso);
-
+    const diasRows = s.diasRango.all(iniIso, finIso);
     const buckets = [];
     for (let i = 0; i < days; i++) {
       const d = isoDateOffset(-(days - 1 - i));
@@ -160,7 +149,9 @@ function getStats(rangeRaw) {
       buckets.push({
         key: d,
         label: dt.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }),
-        shortLabel: days <= 7 ? `${dayShort.replace('.', '')} ${dayNum}` : (i % Math.ceil(days / 8) === 0 ? `${dayNum} ${monthShort.replace('.', '')}` : ''),
+        shortLabel: days <= 7
+          ? `${dayShort.replace('.', '')} ${dayNum}`
+          : (i % Math.ceil(days / 8) === 0 ? `${dayNum} ${monthShort.replace('.', '')}` : ''),
         entradas: 0,
         salidas: 0,
       });

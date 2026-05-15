@@ -102,6 +102,9 @@ function initSchema(database) {
 
     CREATE INDEX IF NOT EXISTS idx_registro_empleado_ts ON registro_eventos(empleado_id, timestamp);
     CREATE INDEX IF NOT EXISTS idx_registro_timestamp ON registro_eventos(timestamp);
+    -- Acelera queries del dashboard / reportes que filtran por tipo + rango
+    -- (motivos, salidas por motivo, KPIs entradas/salidas hoy).
+    CREATE INDEX IF NOT EXISTS idx_registro_tipo_ts ON registro_eventos(tipo, timestamp);
 
     -- Catálogo genérico (salida_tipos, en el futuro puestos, departamentos, etc.)
     CREATE TABLE IF NOT EXISTS catalogo_items (
@@ -142,6 +145,8 @@ function initSchema(database) {
     CREATE INDEX IF NOT EXISTS idx_audit_log_ts     ON audit_log(timestamp);
     CREATE INDEX IF NOT EXISTS idx_audit_log_user   ON audit_log(user_id, timestamp);
     CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action, timestamp);
+    -- Lookup por entidad afectada (drill-down futuro)
+    CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id);
   `);
 
   // Seed default work schedule (only if rows missing).
