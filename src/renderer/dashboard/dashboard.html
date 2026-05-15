@@ -166,7 +166,21 @@
             </div>
           </div>
 
-          <div class="dash-grid-2">
+          <!-- Actividad por hora (full width) -->
+          <div class="window dash-card dash-card--chart">
+            <div class="dash-card-head">
+              <div>
+                <h3 class="dash-card-title">Actividad por hora</h3>
+                <span class="dash-card-sub">entradas y salidas registradas hoy</span>
+              </div>
+              <div id="dash-hourly-legend" class="dash-card-legend"></div>
+            </div>
+            <div id="dash-hourly" class="dash-hourly">
+              <div class="dash-hourly-empty">Sin eventos hoy.</div>
+            </div>
+          </div>
+
+          <div class="dash-grid-2" style="margin-top: 18px;">
             <!-- Actividad reciente -->
             <div class="window dash-card">
               <div class="dash-card-head">
@@ -178,7 +192,7 @@
               </ul>
             </div>
 
-            <!-- Salidas por motivo 7d -->
+            <!-- Salidas por motivo 7d (donut) -->
             <div class="window dash-card">
               <div class="dash-card-head">
                 <h3 class="dash-card-title">Salidas por motivo</h3>
@@ -521,19 +535,31 @@
             <button type="button" id="rep-sm-buscar" class="btn-primary rep-generate-btn">Generar reporte</button>
           </div>
 
-          <div id="rep-sm-summary" class="rep-summary hidden"></div>
+          <div id="rep-sm-summary" class="rep-summary rep-summary--cards hidden"></div>
+
+          <div id="rep-sm-chart" class="window dash-card rep-sm-chart hidden">
+            <div class="dash-card-head">
+              <div>
+                <h3 class="dash-card-title">Distribución por motivo</h3>
+                <span class="dash-card-sub" id="rep-sm-chart-sub">—</span>
+              </div>
+            </div>
+            <div id="rep-sm-chart-body" class="rep-sm-chart-body"></div>
+          </div>
 
           <div class="window users-card">
             <div class="users-table-wrap">
-              <table class="users-table">
+              <table class="users-table rep-sm-table">
                 <thead>
                   <tr>
-                    <th>Motivo</th>
-                    <th style="width: 30%;">Total</th>
+                    <th style="width: 30%;">Motivo</th>
+                    <th>Participación</th>
+                    <th style="width: 90px; text-align: right;">Total</th>
+                    <th style="width: 70px; text-align: right;">%</th>
                   </tr>
                 </thead>
                 <tbody id="rep-sm-tbody">
-                  <tr class="users-empty-row"><td colspan="2">Selecciona rango y presiona Generar.</td></tr>
+                  <tr class="users-empty-row"><td colspan="4">Selecciona rango y presiona Generar.</td></tr>
                 </tbody>
               </table>
             </div>

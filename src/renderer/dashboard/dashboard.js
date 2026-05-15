@@ -75,6 +75,8 @@ const dashActividad = document.getElementById('dash-actividad');
 const dashMotivos = document.getElementById('dash-motivos');
 const dashPresentes = document.getElementById('dash-presentes');
 const dashPresentesCount = document.getElementById('dash-presentes-count');
+const dashHourly = document.getElementById('dash-hourly');
+const dashHourlyLegend = document.getElementById('dash-hourly-legend');
 
 let dashRefreshInterval = null;
 
@@ -86,14 +88,154 @@ function dashFmtTime(iso) {
   return d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
+// ── Chart helpers (SVG, no external libs) ─────────────────────
+const CHART_PALETTE = [
+  '#d97757', // accent (terracotta)
+  '#4f8df7', // blue
+  '#2ea66c', // green
+  '#f3bc4b', // amber
+  '#8b5cf6', // violet
+  '#06b6d4', // cyan
+  '#ec4899', // pink
+  '#84cc16', // lime
+  '#94a3b8', // slate
+];
+function chartColor(i) { return CHART_PALETTE[i % CHART_PALETTE.length]; }
+
+// items: [{ label, value, color? }]
+// opts: { size = 180, thickness = 18, centerTop, centerBottom }
+function donutSVG(items, opts = {}) {
+  const size = opts.size || 180;
+  const thickness = opts.thickness || 18;
+  const cx = size / 2, cy = size / 2;
+  const r = (size - thickness) / 2;
+  const C = 2 * Math.PI * r;
+  const total = items.reduce((s, it) => s + (it.value || 0), 0);
+  const segs = [];
+  if (total > 0) {
+    let acc = 0;
+    items.forEach((it, i) => {
+      const v = Math.max(0, it.value || 0);
+      if (v <= 0) return;
+      const len = (v / total) * C;
+      const color = it.color || chartColor(i);
+      segs.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+        stroke="${color}" stroke-width="${thickness}"
+        stroke-dasharray="${len} ${C - len}"
+        stroke-dashoffset="${-acc}"
+        transform="rotate(-90 ${cx} ${cy})" />`);
+      acc += len;
+    });
+  }
+  const ct = opts.centerTop ? `<text x="${cx}" y="${cy - 2}" text-anchor="middle" class="donut-center-top">${escapeHtml(opts.centerTop)}</text>` : '';
+  const cb = opts.centerBottom ? `<text x="${cx}" y="${cy + 18}" text-anchor="middle" class="donut-center-bot">${escapeHtml(opts.centerBottom)}</text>` : '';
+  return `<svg class="donut-svg" viewBox="0 0 ${size} ${size}" role="img" aria-hidden="true">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface-2-strong, rgba(148,163,184,0.18))" stroke-width="${thickness}" />
+    ${segs.join('')}
+    ${ct}${cb}
+  </svg>`;
+}
+
+// items: [{ label, value, color }]
+function donutLegend(items, total) {
+  if (!items.length) return '';
+  const t = total || items.reduce((s, it) => s + (it.value || 0), 0) || 1;
+  return `<ul class="donut-legend">${items.map((it, i) => {
+    const color = it.color || chartColor(i);
+    const pct = Math.round(((it.value || 0) / t) * 100);
+    return `<li class="donut-legend-item">
+      <span class="donut-legend-dot" style="background:${color}"></span>
+      <span class="donut-legend-label">${escapeHtml(it.label)}</span>
+      <span class="donut-legend-value">${it.value}</span>
+      <span class="donut-legend-pct">${pct}%</span>
+    </li>`;
+  }).join('')}</ul>`;
+}
+
+// series: [{ label, color, points: number[] }]
+// opts: { xLabels: string[] }
+function lineSVG(series, opts = {}) {
+  const w = 720, h = 200;
+  const padL = 36, padR = 12, padT = 10, padB = 28;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+  const n = series[0]?.points?.length || 1;
+
+  let yMax = 0;
+  series.forEach((s) => s.points.forEach((v) => { if (v > yMax) yMax = v; }));
+  yMax = Math.max(4, Math.ceil(yMax * 1.2));
+  // Round yMax up to a nice number
+  const niceStep = yMax <= 8 ? 1 : yMax <= 20 ? 2 : yMax <= 50 ? 5 : 10;
+  yMax = Math.ceil(yMax / niceStep) * niceStep;
+
+  const x = (i) => padL + (n <= 1 ? plotW / 2 : (plotW * i) / (n - 1));
+  const y = (v) => padT + plotH - (plotH * v) / yMax;
+
+  const ySteps = 4;
+  let grid = '';
+  for (let i = 0; i <= ySteps; i++) {
+    const yy = padT + (plotH * i) / ySteps;
+    const label = Math.round(yMax * (1 - i / ySteps));
+    grid += `<line x1="${padL}" y1="${yy}" x2="${w - padR}" y2="${yy}" class="chart-grid" />`;
+    grid += `<text x="${padL - 8}" y="${yy + 4}" text-anchor="end" class="chart-axis">${label}</text>`;
+  }
+
+  let xLabels = '';
+  if (opts.xLabels?.length) {
+    opts.xLabels.forEach((lab, i) => {
+      if (lab) xLabels += `<text x="${x(i)}" y="${h - 8}" text-anchor="middle" class="chart-axis">${escapeHtml(lab)}</text>`;
+    });
+  }
+
+  let paths = '';
+  series.forEach((s) => {
+    const pts = s.points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+    if (pts.length < 2) return;
+    const linePath = `M ${pts.join(' L ')}`;
+    const areaPath = `M ${padL},${y(0)} L ${pts.join(' L ')} L ${x(n - 1)},${y(0)} Z`;
+    paths += `<path d="${areaPath}" fill="${s.color}" opacity="0.12" />`;
+    paths += `<path d="${linePath}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
+  });
+
+  return `<svg class="line-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-hidden="true">
+    ${grid}
+    ${paths}
+    ${xLabels}
+  </svg>`;
+}
+
+function chartLegendInline(series) {
+  return `<ul class="chart-legend-inline">${series.map((s) => `
+    <li><span class="chart-legend-dot" style="background:${s.color}"></span>${escapeHtml(s.label)}</li>
+  `).join('')}</ul>`;
+}
+
 function renderDashboard(stats) {
-  const { kpis, actividad, motivos7d, presentes } = stats;
+  const { kpis, actividad, motivos7d, presentes, horas } = stats;
 
   dashKpiActivos.textContent = kpis.empleadosActivos;
   dashKpiPresentes.textContent = `${kpis.presentes} presentes ahora`;
   dashKpiEntradas.textContent = kpis.entradasHoy;
   dashKpiSalidas.textContent = kpis.salidasHoy;
   dashKpiTotal.textContent = kpis.eventosHoy;
+
+  // Actividad por hora (line chart)
+  const hourSeries = [
+    { label: 'Entradas', color: 'var(--success)', resolvedColor: '#2ea66c', points: (horas || []).map((h) => h.entradas) },
+    { label: 'Salidas',  color: 'var(--error)',   resolvedColor: '#e5484d', points: (horas || []).map((h) => h.salidas) },
+  ];
+  const totalHoras = hourSeries.reduce((s, ser) => s + ser.points.reduce((a, b) => a + b, 0), 0);
+  if (!horas || totalHoras === 0) {
+    dashHourly.innerHTML = '<div class="dash-hourly-empty">Sin eventos hoy.</div>';
+    dashHourlyLegend.innerHTML = '';
+  } else {
+    const xLabels = Array.from({ length: 24 }, (_, h) =>
+      h % 3 === 0 ? `${h.toString().padStart(2, '0')}h` : ''
+    );
+    const seriesForSvg = hourSeries.map((s) => ({ label: s.label, color: s.resolvedColor, points: s.points }));
+    dashHourly.innerHTML = lineSVG(seriesForSvg, { xLabels });
+    dashHourlyLegend.innerHTML = chartLegendInline(seriesForSvg);
+  }
 
   // Actividad
   if (!actividad.length) {
@@ -118,21 +260,22 @@ function renderDashboard(stats) {
     }).join('');
   }
 
-  // Motivos
+  // Salidas por motivo (donut + legend)
   if (!motivos7d.length) {
     dashMotivos.innerHTML = '<div class="dash-motivos-empty">Sin salidas en los últimos 7 días.</div>';
   } else {
-    const max = motivos7d[0].total || 1;
-    dashMotivos.innerHTML = motivos7d.map((m) => {
-      const pct = Math.max(4, Math.round((m.total / max) * 100));
-      return `
-        <div class="dash-motivo-row">
-          <span class="dash-motivo-label">${escapeHtml(m.motivo)}</span>
-          <span class="dash-motivo-count">${m.total}</span>
-          <span class="dash-motivo-bar"><span class="dash-motivo-bar-fill" style="width:${pct}%"></span></span>
-        </div>
-      `;
-    }).join('');
+    const totalMot = motivos7d.reduce((s, m) => s + m.total, 0);
+    const items = motivos7d.map((m, i) => ({
+      label: m.motivo,
+      value: m.total,
+      color: chartColor(i),
+    }));
+    dashMotivos.innerHTML = `
+      <div class="donut-wrap donut-wrap--compact">
+        ${donutSVG(items, { size: 160, thickness: 18, centerTop: String(totalMot), centerBottom: 'salidas' })}
+        ${donutLegend(items, totalMot)}
+      </div>
+    `;
   }
 
   // Presentes
@@ -1632,7 +1775,17 @@ const repSmSummary = document.getElementById('rep-sm-summary');
 const repSmBuscar = document.getElementById('rep-sm-buscar');
 const repSmXlsx = document.getElementById('rep-sm-xlsx');
 const repSmPdf = document.getElementById('rep-sm-pdf');
+const repSmChart = document.getElementById('rep-sm-chart');
+const repSmChartBody = document.getElementById('rep-sm-chart-body');
+const repSmChartSub = document.getElementById('rep-sm-chart-sub');
 let repSmData = null;
+
+function repSmDaysBetween(iniIso, finIso) {
+  const a = new Date(iniIso + 'T00:00:00');
+  const b = new Date(finIso + 'T00:00:00');
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 1;
+  return Math.max(1, Math.round((b - a) / 86400000) + 1);
+}
 
 (function initRepSmDates() {
   const today = new Date();
@@ -1642,44 +1795,87 @@ let repSmData = null;
 })();
 
 async function repSmGenerar() {
-  repSmTbody.innerHTML = '<tr class="users-empty-row"><td colspan="2">Cargando…</td></tr>';
+  repSmTbody.innerHTML = '<tr class="users-empty-row"><td colspan="4">Cargando…</td></tr>';
   repSmSummary.classList.add('hidden');
+  repSmChart.classList.add('hidden');
   const res = await window.api.reporteSalidasMotivo(repSmIni.value, repSmFin.value);
   if (!res?.ok) {
-    repSmTbody.innerHTML = `<tr class="users-empty-row"><td colspan="2">${escapeHtml(res?.error || 'Error')}</td></tr>`;
+    repSmTbody.innerHTML = `<tr class="users-empty-row"><td colspan="4">${escapeHtml(res?.error || 'Error')}</td></tr>`;
     repSmXlsx.disabled = true; repSmPdf.disabled = true;
     return;
   }
   repSmData = res;
+
+  const days = repSmDaysBetween(res.rango.ini, res.rango.fin);
+  const promedio = (res.total / days).toFixed(1);
+  const topMotivo = res.rows[0]?.motivo || '—';
+  const topTotal = res.rows[0]?.total || 0;
+  const topPct = res.total > 0 ? Math.round((topTotal / res.total) * 100) : 0;
+
   repSmSummary.innerHTML = `
-    <div class="rep-summary-item">
-      <span class="rep-summary-label">Rango</span>
-      <span class="rep-summary-value">${escapeHtml(res.rango.ini)} → ${escapeHtml(res.rango.fin)}</span>
-    </div>
-    <div class="rep-summary-item">
+    <div class="rep-summary-card">
       <span class="rep-summary-label">Total salidas</span>
-      <span class="rep-summary-value">${res.total}</span>
+      <span class="rep-summary-value rep-summary-value--xl">${res.total}</span>
+      <span class="rep-summary-sub">${days} ${days === 1 ? 'día' : 'días'}</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Promedio diario</span>
+      <span class="rep-summary-value rep-summary-value--xl">${promedio}</span>
+      <span class="rep-summary-sub">salidas/día</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Motivo principal</span>
+      <span class="rep-summary-value rep-summary-value--md">${escapeHtml(topMotivo)}</span>
+      <span class="rep-summary-sub">${topTotal} · ${topPct}%</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Tipos de motivo</span>
+      <span class="rep-summary-value rep-summary-value--xl">${res.rows.length}</span>
+      <span class="rep-summary-sub">${escapeHtml(res.rango.ini)} → ${escapeHtml(res.rango.fin)}</span>
     </div>
   `;
   repSmSummary.classList.remove('hidden');
 
   if (!res.rows.length) {
-    repSmTbody.innerHTML = '<tr class="users-empty-row"><td colspan="2">Sin salidas en el rango.</td></tr>';
+    repSmTbody.innerHTML = '<tr class="users-empty-row"><td colspan="4">Sin salidas en el rango.</td></tr>';
     repSmXlsx.disabled = true; repSmPdf.disabled = true;
     return;
   }
-  const max = res.rows[0]?.total || 1;
-  repSmTbody.innerHTML = res.rows.map((r) => {
-    const widthPct = Math.max(4, (r.total / max) * 100);
+
+  const items = res.rows.map((r, i) => ({
+    label: r.motivo,
+    value: r.total,
+    color: chartColor(i),
+  }));
+
+  repSmChartSub.textContent = `${res.rows.length} ${res.rows.length === 1 ? 'motivo' : 'motivos'} · ${res.total} salidas`;
+  repSmChartBody.innerHTML = `
+    <div class="donut-wrap donut-wrap--large">
+      ${donutSVG(items, { size: 220, thickness: 26, centerTop: String(res.total), centerBottom: 'salidas' })}
+      ${donutLegend(items, res.total)}
+    </div>
+  `;
+  repSmChart.classList.remove('hidden');
+
+  repSmTbody.innerHTML = res.rows.map((r, i) => {
+    const pct = res.total > 0 ? (r.total / res.total) * 100 : 0;
+    const widthPct = Math.max(4, pct);
+    const color = chartColor(i);
     return `
       <tr>
-        <td>${escapeHtml(r.motivo)}</td>
         <td>
-          <div class="rep-bar-cell">
-            <span class="rep-bar" style="width: ${widthPct}%;"></span>
-            <span class="rep-bar-num">${r.total}</span>
+          <div class="rep-sm-motivo-cell">
+            <span class="rep-sm-motivo-dot" style="background:${color}"></span>
+            <span>${escapeHtml(r.motivo)}</span>
           </div>
         </td>
+        <td>
+          <div class="rep-bar-cell">
+            <span class="rep-bar" style="width: ${widthPct}%; background: ${color};"></span>
+          </div>
+        </td>
+        <td style="text-align: right;"><span class="rep-bar-num">${r.total}</span></td>
+        <td style="text-align: right;"><span class="rep-bar-num">${pct.toFixed(1)}%</span></td>
       </tr>
     `;
   }).join('');

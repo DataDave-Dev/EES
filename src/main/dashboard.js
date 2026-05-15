@@ -84,9 +84,29 @@ function getStats() {
         AND date(timestamp, 'localtime') >= date('now', 'localtime', '-6 days')
       GROUP BY motivo
       ORDER BY total DESC
-      LIMIT 6
+      LIMIT 8
     `)
     .all();
+
+  // ── Actividad por hora (hoy) ─────────────────────────
+  // Devuelve 24 buckets (0..23) con conteo de entradas y salidas.
+  const horasRows = db
+    .prepare(`
+      SELECT
+        CAST(strftime('%H', timestamp, 'localtime') AS INTEGER) AS hora,
+        tipo,
+        COUNT(*) AS total
+      FROM registro_eventos
+      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+      GROUP BY hora, tipo
+    `)
+    .all();
+  const horas = Array.from({ length: 24 }, (_, h) => ({ hora: h, entradas: 0, salidas: 0 }));
+  for (const r of horasRows) {
+    if (r.hora < 0 || r.hora > 23) continue;
+    if (r.tipo === 'entrada') horas[r.hora].entradas = r.total;
+    else if (r.tipo === 'salida') horas[r.hora].salidas = r.total;
+  }
 
   return {
     kpis: {
@@ -99,6 +119,7 @@ function getStats() {
     presentes,
     actividad,
     motivos7d,
+    horas,
   };
 }
 

@@ -2184,10 +2184,11 @@ input:-webkit-autofill {
   }
   .rep-bar {
     display: inline-block;
-    height: 8px;
-    border-radius: 4px;
+    height: 10px;
+    border-radius: 5px;
     background: var(--accent);
     flex-shrink: 0;
+    transition: width 240ms ease;
   }
   .rep-bar-num {
     font-family: 'Geist Mono', monospace;
@@ -2195,6 +2196,229 @@ input:-webkit-autofill {
     font-weight: 600;
     min-width: 40px;
     text-align: right;
+  }
+
+  /* ── Chart primitives ──────────────────────────────────── */
+  .donut-svg {
+    display: block;
+    flex-shrink: 0;
+  }
+  .donut-center-top {
+    font-size: 22px;
+    font-weight: 700;
+    fill: var(--text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.4px;
+  }
+  .donut-center-bot {
+    font-family: 'Geist Mono', monospace;
+    font-size: 9.5px;
+    fill: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .donut-wrap {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+  }
+  .donut-wrap--compact { gap: 16px; }
+  .donut-wrap--large { gap: 28px; padding: 8px 4px; }
+  @media (max-width: 720px) {
+    .donut-wrap, .donut-wrap--compact, .donut-wrap--large {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 14px;
+    }
+    .donut-svg { margin: 0 auto; }
+  }
+  .donut-legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .donut-legend-item {
+    display: grid;
+    grid-template-columns: 10px 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background 120ms ease;
+  }
+  .donut-legend-item:hover { background: var(--hover); }
+  .donut-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+  .donut-legend-label {
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .donut-legend-value {
+    font-family: 'Geist Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text);
+    min-width: 28px;
+    text-align: right;
+  }
+  .donut-legend-pct {
+    font-family: 'Geist Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+    color: var(--muted);
+    min-width: 38px;
+    text-align: right;
+  }
+
+  /* Line chart */
+  .line-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 240px;
+  }
+  .chart-grid {
+    stroke: var(--border-soft);
+    stroke-width: 1;
+  }
+  .chart-axis {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    fill: var(--muted);
+  }
+  .chart-legend-inline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+  .chart-legend-inline li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .chart-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    display: inline-block;
+  }
+
+  /* Dashboard hourly card */
+  .dash-card-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .dash-card--chart .dash-card-head {
+    align-items: center;
+  }
+  .dash-hourly {
+    padding: 4px 0 0;
+  }
+  .dash-hourly-empty {
+    padding: 40px 10px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* Salidas por motivo report */
+  .rep-summary--cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-left: 0;
+    border-radius: 0;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 900px) {
+    .rep-summary--cards { grid-template-columns: repeat(2, 1fr); }
+  }
+  .rep-summary-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px var(--window-shadow-2);
+  }
+  .rep-summary-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--accent);
+  }
+  .rep-summary-value--xl {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.6px;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+  .rep-summary-value--md {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.2px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rep-summary-sub {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .rep-sm-chart {
+    padding: 20px 22px;
+    margin-bottom: 16px;
+  }
+  .rep-sm-chart-body {
+    padding-top: 4px;
+  }
+  .rep-sm-table .rep-sm-motivo-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .rep-sm-motivo-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px var(--surface);
   }
 
   /* Permissions matrix */
