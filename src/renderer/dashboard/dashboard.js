@@ -2216,7 +2216,11 @@ function repSmExportPayload(format) {
 repSmXlsx.addEventListener('click', () => { const p = repSmExportPayload('xlsx'); if (p) handleExport('xlsx', p); });
 repSmPdf .addEventListener('click', () => { const p = repSmExportPayload('pdf');  if (p) handleExport('pdf',  p); });
 
-// ── Configuración general (horario laboral) ───────────────────
+// ── Configuración general (empresa + horario laboral) ─────────
+const cfgCompanyName     = document.getElementById('cfg-company-name');
+const cfgCompanySaveBtn  = document.getElementById('cfg-company-save-btn');
+const cfgCompanyError    = document.getElementById('cfg-company-error');
+const cfgCompanySuccess  = document.getElementById('cfg-company-success');
 const cfgWorkStart = document.getElementById('cfg-work-start');
 const cfgWorkEnd   = document.getElementById('cfg-work-end');
 const cfgWeekdays  = document.getElementById('cfg-weekdays');
@@ -2258,19 +2262,52 @@ let cfgSelectedDays = new Set();
 async function loadCfgSchedule() {
   cfgError.classList.add('hidden');
   cfgSuccess.classList.add('hidden');
-  const res = await window.api.getWorkSchedule();
-  if (!res?.ok) {
-    cfgError.textContent = res?.error || 'No se pudo cargar el horario';
+  cfgCompanyError.classList.add('hidden');
+  cfgCompanySuccess.classList.add('hidden');
+
+  const [schedRes, nameRes] = await Promise.all([
+    window.api.getWorkSchedule(),
+    window.api.getCompanyName(),
+  ]);
+
+  if (!schedRes?.ok) {
+    cfgError.textContent = schedRes?.error || 'No se pudo cargar el horario';
     cfgError.classList.remove('hidden');
     return;
   }
-  cfgScheduleCache = res.schedule;
-  cfgWorkStart.value = res.schedule.work_start;
-  cfgWorkEnd.value   = res.schedule.work_end;
-  cfgSelectedDays = new Set(res.schedule.work_days);
+  cfgScheduleCache = schedRes.schedule;
+  cfgWorkStart.value = schedRes.schedule.work_start;
+  cfgWorkEnd.value   = schedRes.schedule.work_end;
+  cfgSelectedDays = new Set(schedRes.schedule.work_days);
   renderWeekdayPills(cfgSelectedDays);
+
+  // Show the stored value (input stays empty when default is being used,
+  // so the placeholder hints the fallback).
+  if (nameRes?.ok) {
+    cfgCompanyName.value = nameRes.customized ? (nameRes.stored || '') : '';
+  }
+
   cfgLoaded = true;
 }
+
+cfgCompanySaveBtn.addEventListener('click', async () => {
+  cfgCompanyError.classList.add('hidden');
+  cfgCompanySuccess.classList.add('hidden');
+  cfgCompanySaveBtn.disabled = true;
+  const res = await window.api.setCompanyName(cfgCompanyName.value);
+  cfgCompanySaveBtn.disabled = false;
+  if (!res?.ok) {
+    cfgCompanyError.textContent = res?.error || 'No se pudo guardar';
+    cfgCompanyError.classList.remove('hidden');
+    return;
+  }
+  cfgCompanySuccess.classList.remove('hidden');
+  setTimeout(() => cfgCompanySuccess.classList.add('hidden'), 2500);
+  // Refresh brand display across the open window immediately.
+  if (window.EES_BRAND?.applyAll) {
+    await window.EES_BRAND.applyAll({ force: true });
+  }
+});
 
 cfgSaveBtn.addEventListener('click', async () => {
   cfgError.classList.add('hidden');
@@ -2644,6 +2681,7 @@ const AUDIT_ACTION_LABELS = {
   'catalogo.estatus_change':   'Catálogo · estatus',
   'catalogo.delete':           'Catálogo · eliminación',
   'config.work_schedule_update': 'Horario laboral · cambio',
+  'config.company_name_update':  'Nombre empresa · cambio',
 };
 function auditActionLabel(code) {
   return AUDIT_ACTION_LABELS[code] || code;

@@ -15,9 +15,9 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div class="identity-mark sidebar-mark">O</div>
+        <div class="identity-mark sidebar-mark" data-brand-initial>O</div>
         <div class="sidebar-brand">
-          <div class="sidebar-brand-title">Onix</div>
+          <div class="sidebar-brand-title" data-brand-name>Onix</div>
           <div class="sidebar-brand-sub">Control de asistencia</div>
         </div>
       </div>
@@ -646,7 +646,23 @@
         <section class="view" data-view="configuracion-general">
           <div style="margin-bottom: 8px;">
             <h2 style="font-size: 20px; font-weight: 600; letter-spacing: -0.2px; margin: 0 0 4px;">Configuración general</h2>
-            <p style="color: var(--muted); font-size: 13.5px; margin: 0 0 16px;">Horario laboral que se usa para calcular las horas dentro y fuera de la empresa.</p>
+            <p style="color: var(--muted); font-size: 13.5px; margin: 0 0 16px;">Datos de la empresa y horario laboral.</p>
+          </div>
+
+          <div class="settings-card cfg-card" style="margin-bottom: 14px;">
+            <div class="settings-section-title">Empresa</div>
+            <label class="field" style="max-width: 420px;">
+              <span class="field-label">Nombre de la empresa</span>
+              <span class="field-shell">
+                <input type="text" id="cfg-company-name" class="field-input" autocomplete="off" maxlength="60" placeholder="Onix" />
+              </span>
+              <span class="field-hint">Aparece en la pantalla de login, sidebar, exportaciones y reportes. Si lo dejas vacío se usará <b>Onix</b> por defecto.</span>
+            </label>
+            <div id="cfg-company-error" class="alert-error hidden" style="margin-top: 12px;"></div>
+            <div id="cfg-company-success" class="alert-success hidden" style="margin-top: 12px;">Nombre actualizado.</div>
+            <div class="cfg-actions">
+              <button type="button" id="cfg-company-save-btn" class="btn-primary btn-primary--auto">Guardar cambios</button>
+            </div>
           </div>
 
           <div class="settings-card cfg-card">
@@ -1058,6 +1074,7 @@
   <script src="../shared/icons.js"></script>
   <script src="../shared/password.js"></script>
   <script src="../shared/permissions.js"></script>
+  <script src="../shared/brand.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

@@ -58,6 +58,17 @@ function getCompanyName() {
   return v || DEFAULT_COMPANY_NAME;
 }
 
+function getCompanyNameInfo() {
+  const db = getDb();
+  const row = db.prepare("SELECT value FROM app_settings WHERE key = 'company_name'").get();
+  const stored = String(row?.value || '').trim();
+  return {
+    name: stored || DEFAULT_COMPANY_NAME,
+    stored,
+    customized: stored.length > 0,
+  };
+}
+
 function setCompanyName(name) {
   const v = String(name ?? '').trim();
   if (v.length > MAX_COMPANY_NAME) {
@@ -75,6 +86,7 @@ module.exports = {
   getWorkSchedule,
   setWorkSchedule,
   getCompanyName,
+  getCompanyNameInfo,
   setCompanyName,
   DEFAULT_COMPANY_NAME,
 };

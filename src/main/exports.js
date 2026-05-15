@@ -2,6 +2,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { dialog, BrowserWindow } = require('electron');
 const ExcelJS = require('exceljs');
+const configLib = require('./configuracion');
 
 function defaultFilename(base, ext) {
   const now = new Date();
@@ -22,7 +23,7 @@ async function exportExcel(sender, { title, columns, rows, defaultBase = 'report
   if (canceled || !filePath) return { ok: false, canceled: true };
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Onix';
+  wb.creator = configLib.getCompanyName();
   wb.created = new Date();
   const ws = wb.addWorksheet(title || 'Reporte');
 
@@ -322,6 +323,7 @@ async function exportPdf(sender, payload = {}) {
 
   try {
     await off.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(fullHtml));
+    const brandFooter = escapeForHtml(configLib.getCompanyName());
     const buf = await off.webContents.printToPDF({
       pageSize: 'Letter',
       printBackground: true,
@@ -330,7 +332,7 @@ async function exportPdf(sender, payload = {}) {
       headerTemplate: '<div></div>',
       footerTemplate: `
         <div style="font-size:8.5px; width:100%; padding:0 16mm; color:#6b7280; display:flex; justify-content:space-between; align-items:center; font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
-          <span>Onix · Control de asistencia</span>
+          <span>${brandFooter} · Control de asistencia</span>
           <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
         </div>`,
     });

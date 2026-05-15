@@ -617,7 +617,7 @@ function registerIpc() {
   // write requires admin (usuarios permission).
   ipcMain.handle(
     'configuracion:getCompanyName',
-    safe(async () => ({ ok: true, name: configuracionLib.getCompanyName() }))
+    safe(async () => ({ ok: true, ...configuracionLib.getCompanyNameInfo() }))
   );
   ipcMain.handle(
     'configuracion:setCompanyName',
