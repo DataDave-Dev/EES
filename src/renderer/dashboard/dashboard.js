@@ -1610,7 +1610,10 @@ function switchView(key) {
   if (key === 'registro') loadTodayEvents();
   if (key === 'rep-historial') loadRepHiEmpleados();
   if (key === 'rep-horas-dentro-fuera') refreshHdScheduleNote();
-  if (key === 'configuracion-general' && !cfgLoaded) loadCfgSchedule();
+  if (key === 'configuracion-general') {
+    if (!cfgLoaded) loadCfgSchedule();
+    loadAboutInfo();
+  }
   if (key === 'auditoria') { loadAuditFilters().then(loadAuditLog); }
   if (key === 'dashboard') startDashboardAutoRefresh();
   else stopDashboardAutoRefresh();
@@ -2443,6 +2446,94 @@ cfgSaveBtn.addEventListener('click', async () => {
   cfgScheduleCache = res.schedule;
   cfgSuccess.classList.remove('hidden');
   setTimeout(() => cfgSuccess.classList.add('hidden'), 2500);
+});
+
+// ── Acerca de la aplicación / actualizaciones ───────────────
+const aboutName     = document.getElementById('about-name');
+const aboutVersion  = document.getElementById('about-version');
+const aboutPlatform = document.getElementById('about-platform');
+const aboutElectron = document.getElementById('about-electron');
+const aboutFeed     = document.getElementById('about-feed');
+const aboutStatus   = document.getElementById('about-update-status');
+const aboutCheckBtn = document.getElementById('about-check-btn');
+
+const PLATFORM_LABELS = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
+
+function setAboutStatus(text, variant) {
+  if (!text) {
+    aboutStatus.classList.add('hidden');
+    aboutStatus.textContent = '';
+    return;
+  }
+  aboutStatus.classList.remove('hidden', 'alert-info', 'alert-success', 'alert-error');
+  aboutStatus.classList.add(variant || 'alert-info');
+  aboutStatus.textContent = text;
+}
+
+async function loadAboutInfo() {
+  const res = await window.api.getVersionInfo();
+  if (!res?.ok || !res.info) return;
+  const info = res.info;
+  aboutName.textContent     = info.name || 'Onix';
+  aboutVersion.textContent  = `v${info.version}${info.packaged ? '' : ' (desarrollo)'}`;
+  aboutPlatform.textContent = `${PLATFORM_LABELS[info.platform] || info.platform} · ${info.arch}`;
+  aboutElectron.textContent = `Electron ${info.electron} · Node ${info.node}`;
+  aboutFeed.textContent     = info.feedRepo ? `GitHub Releases (${info.feedRepo})` : '—';
+  if (info.alreadyDownloaded) {
+    const name = info.alreadyDownloaded.releaseName;
+    setAboutStatus(
+      name
+        ? `Hay una actualización ${name} descargada. Se aplicará al reiniciar la app.`
+        : 'Hay una actualización descargada. Se aplicará al reiniciar la app.',
+      'alert-success'
+    );
+  }
+}
+
+aboutCheckBtn.addEventListener('click', async () => {
+  aboutCheckBtn.disabled = true;
+  const previousLabel = aboutCheckBtn.textContent;
+  aboutCheckBtn.textContent = 'Buscando…';
+  setAboutStatus('Consultando actualizaciones en GitHub…', 'alert-info');
+
+  const res = await window.api.checkForUpdates();
+
+  aboutCheckBtn.disabled = false;
+  aboutCheckBtn.textContent = previousLabel;
+
+  if (!res || (!res.ok && res.status !== 'unsupported')) {
+    setAboutStatus(res?.error || 'No se pudo consultar el servidor de actualizaciones.', 'alert-error');
+    return;
+  }
+
+  switch (res.status) {
+    case 'not-available':
+      setAboutStatus('Tienes la última versión instalada.', 'alert-success');
+      break;
+    case 'available':
+      setAboutStatus('Hay una nueva versión disponible. Descargando en segundo plano…', 'alert-info');
+      break;
+    case 'downloaded': {
+      const name = res.releaseName;
+      setAboutStatus(
+        name
+          ? `Actualización ${name} lista. Se aplicará al reiniciar la app.`
+          : 'Actualización lista. Se aplicará al reiniciar la app.',
+        'alert-success'
+      );
+      break;
+    }
+    case 'unsupported':
+      setAboutStatus(res.error || 'Esta función no está disponible en este entorno.', 'alert-info');
+      break;
+    case 'timeout':
+      setAboutStatus('No hubo respuesta del servidor de actualizaciones. Intenta de nuevo en un momento.', 'alert-error');
+      break;
+    case 'error':
+    default:
+      setAboutStatus(res.error || 'Ocurrió un error al consultar actualizaciones.', 'alert-error');
+      break;
+  }
 });
 
 // ── Reporte 4: Horas dentro/fuera ─────────────────────────────

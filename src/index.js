@@ -9,6 +9,20 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+if (app.isPackaged && process.platform === 'win32') {
+  const { updateElectronApp, UpdateSourceType } = require('update-electron-app');
+  const { attachPersistentListeners } = require('./main/updater');
+  attachPersistentListeners();
+  updateElectronApp({
+    updateSource: {
+      type: UpdateSourceType.ElectronPublicUpdateService,
+      repo: 'DataDave-Dev/EES',
+    },
+    updateInterval: '1 hour',
+    notifyUser: true,
+  });
+}
+
 let mainWindow = null;
 
 function createWindow() {

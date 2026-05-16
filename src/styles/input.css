@@ -449,6 +449,13 @@ input:-webkit-autofill {
     color: var(--success);
     font-size: 12.5px;
   }
+  .alert-info {
+    @apply flex items-center gap-2 rounded-lg px-3 py-2;
+    background: rgba(85, 130, 200, 0.10);
+    border: 1px solid rgba(85, 130, 200, 0.28);
+    color: var(--text);
+    font-size: 12.5px;
+  }
 
   /* Spinner */
   .spin {
@@ -2684,6 +2691,23 @@ input:-webkit-autofill {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     max-width: 420px;
+  }
+  .cfg-about-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 18px;
+    margin: 4px 0 0;
+    font-size: 13.5px;
+  }
+  .cfg-about-grid dt {
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .cfg-about-grid dd {
+    color: var(--text);
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    word-break: break-all;
   }
   @media (max-width: 600px) {
     .cfg-grid { grid-template-columns: 1fr; }

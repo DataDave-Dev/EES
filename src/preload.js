@@ -81,4 +81,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('catalogos:deleteItem', { id }),
 
   setView: (view) => ipcRenderer.invoke('window:setView', view),
+
+  // App / actualizaciones remotas
+  getVersionInfo: () => ipcRenderer.invoke('app:getVersionInfo'),
+  checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
 });

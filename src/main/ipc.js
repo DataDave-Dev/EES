@@ -8,6 +8,7 @@ const exportsLib = require('./exports');
 const dashboardLib = require('./dashboard');
 const configuracionLib = require('./configuracion');
 const auditLib = require('./audit');
+const updater = require('./updater');
 
 // Convenience: append an audit entry tagged with the current user as actor.
 function auditAction(action, info = {}) {
@@ -688,6 +689,10 @@ function registerIpc() {
   );
 
   ipcMain.handle('window:setView', safe(async (event, view) => setView(event, view)));
+
+  // Información de la app y actualizaciones remotas.
+  ipcMain.handle('app:getVersionInfo', safe(async () => ({ ok: true, info: updater.getVersionInfo() })));
+  ipcMain.handle('app:checkForUpdates', safe(async () => updater.checkForUpdates()));
 }
 
 module.exports = { registerIpc, VIEW_SIZES };
