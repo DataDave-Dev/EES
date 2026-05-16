@@ -13,6 +13,12 @@ module.exports = {
       config: {
         setupIcon: 'src/assets/logo/icon.ico',
         iconUrl: 'https://raw.githubusercontent.com/DataDave-Dev/EES/master/src/assets/logo/icon.ico',
+        // Pantalla mostrada durante la instalación inicial; el GIF se genera
+        // en build vía scripts/generate-loading-gif.js. Si no existe, Squirrel
+        // simplemente no lo usa.
+        loadingGif: 'src/assets/logo/installer-splash.gif',
+        // Nombre amigable del instalador resultante (en lugar de SetupExe genérico).
+        setupExe: 'Onix-Setup.exe',
       },
     },
     {
