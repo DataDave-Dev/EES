@@ -45,7 +45,7 @@ module.exports = {
           name: 'EES',
         },
         prerelease: false,
-        draft: true,
+        draft: false,
       },
     },
   ],
