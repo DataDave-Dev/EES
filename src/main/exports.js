@@ -10,6 +10,16 @@ function defaultFilename(base, ext) {
   return `${base}-${stamp}.${ext}`;
 }
 
+// Mismo formato 12h ("2:30 p.m.") que usa la UI, para que la fecha del
+// encabezado del PDF se vea consistente con el resto del sistema.
+function formatGeneratedAt(d = new Date()) {
+  const fecha = d.toLocaleDateString('es-MX', { dateStyle: 'long' });
+  const periodo = d.getHours() >= 12 ? 'p.m.' : 'a.m.';
+  const h12 = (() => { const x = d.getHours() % 12; return x === 0 ? 12 : x; })();
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${fecha}, ${h12}:${mm} ${periodo}`;
+}
+
 // ── Excel ────────────────────────────────────────────────────
 // columns: [{ key, header, width? }]
 // rows: array of objects keyed by column.key
@@ -305,7 +315,7 @@ async function exportPdf(sender, payload = {}) {
     </div>
     <div class="pdf-header-right">
       <div class="pdf-header-right-label">Generado</div>
-      <div>${escapeForHtml(new Date().toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' }))}</div>
+      <div>${escapeForHtml(formatGeneratedAt())}</div>
     </div>
   </header>
 

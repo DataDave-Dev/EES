@@ -10,13 +10,7 @@ function escapeHtml(s) {
 function initials(nombre, apellidos) {
   return ((nombre?.[0] || '') + (apellidos?.[0] || '')).toUpperCase() || '·';
 }
-function fmtTime(iso) {
-  if (!iso) return '—';
-  const utcIso = iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z';
-  const d = new Date(utcIso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true });
-}
+const fmtTime = window.EES_TIME.fmtTime12;
 
 function goBack() {
   window.location.href = '../dashboard/dashboard.html#registro';
@@ -69,9 +63,7 @@ function tick() {
   regNowDate.textContent = now.toLocaleDateString('es-MX', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
-  regNowTime.textContent = now.toLocaleTimeString('es-MX', {
-    hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
-  });
+  regNowTime.textContent = window.EES_TIME.fmtClockSeconds(now);
 }
 tick();
 setInterval(tick, 1000);

@@ -94,13 +94,7 @@ const RANGE_TITLES = {
   '30d': { title: 'Actividad diaria',   sub: 'entradas y salidas, últimos 30 días', motSub: 'últimos 30 días' },
 };
 
-function dashFmtTime(iso) {
-  if (!iso) return '—';
-  const utcIso = iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z';
-  const d = new Date(utcIso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true });
-}
+const dashFmtTime = window.EES_TIME.fmtTime12;
 
 // ── Chart helpers (SVG, no external libs) ─────────────────────
 const CHART_PALETTE = [
@@ -1258,24 +1252,8 @@ document.getElementById('reg-open-new').addEventListener('click', () => {
   window.location.href = '../registro-nuevo/registro-nuevo.html';
 });
 
-function fmtTime(iso) {
-  if (!iso) return '—';
-  const utcIso = iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z';
-  const d = new Date(utcIso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true });
-}
-
-function fmtDateTime(iso) {
-  if (!iso) return '—';
-  const utcIso = iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z';
-  const d = new Date(utcIso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('es-MX', {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit', hour12: true,
-  });
-}
+const fmtTime = window.EES_TIME.fmtTime12;
+const fmtDateTime = window.EES_TIME.fmtDateTime12;
 
 function tipoBadge(tipo) {
   const cls = tipo === 'entrada' ? 'reg-tipo-badge--in' : 'reg-tipo-badge--out';
@@ -3070,16 +3048,7 @@ function auditActionKind(code) {
   return 'neutral';
 }
 
-function auditFmtDateTime(iso) {
-  if (!iso) return '—';
-  const utcIso = iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z';
-  const d = new Date(utcIso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('es-MX', {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
-  });
-}
+const auditFmtDateTime = window.EES_TIME.fmtDateTime12Seconds;
 
 async function loadAuditFilters() {
   if (auditState.filtersLoaded) return;
