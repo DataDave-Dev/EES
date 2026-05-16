@@ -14,9 +14,11 @@
     "build:css": "tailwindcss -i ./src/styles/input.css -o ./src/styles/output.css --minify",
     "watch:css": "tailwindcss -i ./src/styles/input.css -o ./src/styles/output.css --watch",
     "rebuild": "electron-rebuild -f -w better-sqlite3,bcrypt",
+    "fix-squirrel": "node scripts/fix-squirrel.js",
+    "postinstall": "node scripts/fix-squirrel.js",
     "package": "npm run build:css && electron-forge package",
-    "make": "npm run build:css && electron-forge make",
-    "publish": "electron-forge publish",
+    "make": "npm run build:css && npm run fix-squirrel && electron-forge make",
+    "publish": "npm run fix-squirrel && electron-forge publish",
     "lint": "echo \"No linting configured\""
   },
   "keywords": [],
