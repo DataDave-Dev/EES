@@ -2449,15 +2449,32 @@ cfgSaveBtn.addEventListener('click', async () => {
 });
 
 // ── Acerca de la aplicación / actualizaciones ───────────────
-const aboutName     = document.getElementById('about-name');
-const aboutVersion  = document.getElementById('about-version');
-const aboutPlatform = document.getElementById('about-platform');
-const aboutElectron = document.getElementById('about-electron');
-const aboutFeed     = document.getElementById('about-feed');
-const aboutStatus   = document.getElementById('about-update-status');
-const aboutCheckBtn = document.getElementById('about-check-btn');
+const aboutName       = document.getElementById('about-name');
+const aboutVersion    = document.getElementById('about-version');
+const aboutPlatform   = document.getElementById('about-platform');
+const aboutElectron   = document.getElementById('about-electron');
+const aboutFeed       = document.getElementById('about-feed');
+const aboutStatus     = document.getElementById('about-update-status');
+const aboutCheckBtn   = document.getElementById('about-check-btn');
+const aboutInstallBtn = document.getElementById('about-install-btn');
+const aboutUpdPanel   = document.getElementById('about-update-panel');
+const aboutUpdVer     = document.getElementById('about-update-version');
+const aboutUpdNotes   = document.getElementById('about-update-notes');
+
+const updModal        = document.getElementById('update-modal');
+const updModalVersion = document.getElementById('update-modal-version');
+const updModalCurrent = document.getElementById('update-modal-current');
+const updModalNotes   = document.getElementById('update-modal-notes');
+const updModalInstall = document.getElementById('update-modal-install');
+
+document.getElementById('icon-updmodal-close').innerHTML  = I.close(16);
+document.getElementById('icon-about-update').innerHTML    = I.download(16);
+document.getElementById('icon-update-hero').innerHTML     = I.download(20);
 
 const PLATFORM_LABELS = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
+
+let installedVersionLabel = '—';
+let updateModalShownFor = null; // versión para la que ya se mostró el modal en esta sesión
 
 function setAboutStatus(text, variant) {
   if (!text) {
@@ -2470,23 +2487,152 @@ function setAboutStatus(text, variant) {
   aboutStatus.textContent = text;
 }
 
+// Convierte release notes (Markdown/texto/XML simple) en HTML seguro.
+// Sólo aceptamos un subconjunto: párrafos, listas, encabezados, negritas, código.
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+function renderReleaseNotes(raw) {
+  const text = (raw || '').toString().trim();
+  if (!text) return '<div class="update-notes-empty">El autor no incluyó descripción para esta versión.</div>';
+
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  let listType = null;
+  let listBuf = [];
+  let paraBuf = [];
+
+  const flushList = () => {
+    if (listType) {
+      out.push(`<${listType}>${listBuf.map((it) => `<li>${inline(it)}</li>`).join('')}</${listType}>`);
+      listType = null;
+      listBuf = [];
+    }
+  };
+  const flushPara = () => {
+    if (paraBuf.length) {
+      out.push(`<p>${paraBuf.map(inline).join('<br>')}</p>`);
+      paraBuf = [];
+    }
+  };
+  const inline = (s) => {
+    let h = escapeHtml(s);
+    h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+    h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/(^|\s)\*([^*]+)\*/g, '$1<em>$2</em>');
+    // Links Markdown [txt](url)
+    h = h.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    return h;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\s+$/, '');
+    if (!line.trim()) {
+      flushList(); flushPara();
+      continue;
+    }
+    const h = line.match(/^(#{1,3})\s+(.+)/);
+    if (h) {
+      flushList(); flushPara();
+      const lvl = h[1].length;
+      out.push(`<h${lvl}>${inline(h[2])}</h${lvl}>`);
+      continue;
+    }
+    const ul = line.match(/^\s*[-*+]\s+(.+)/);
+    if (ul) {
+      flushPara();
+      if (listType !== 'ul') { flushList(); listType = 'ul'; }
+      listBuf.push(ul[1]);
+      continue;
+    }
+    const ol = line.match(/^\s*\d+\.\s+(.+)/);
+    if (ol) {
+      flushPara();
+      if (listType !== 'ol') { flushList(); listType = 'ol'; }
+      listBuf.push(ol[1]);
+      continue;
+    }
+    flushList();
+    paraBuf.push(line.trim());
+  }
+  flushList(); flushPara();
+  return out.join('') || '<div class="update-notes-empty">El autor no incluyó descripción para esta versión.</div>';
+}
+
+function openUpdateModal() {
+  updModal.classList.remove('hidden');
+}
+function closeUpdateModal() {
+  updModal.classList.add('hidden');
+}
+updModal.querySelectorAll('[data-updmodal-close]').forEach((el) => {
+  el.addEventListener('click', closeUpdateModal);
+});
+updModal.addEventListener('click', (e) => {
+  if (e.target === updModal) closeUpdateModal();
+});
+
+function applyDownloadedUpdate(payload, { showModal = false } = {}) {
+  if (!payload) return;
+  const versionLabel = payload.releaseName || 'nueva versión';
+  const notesHtml = renderReleaseNotes(payload.releaseNotes);
+
+  // Modal
+  updModalVersion.textContent = versionLabel;
+  updModalCurrent.textContent = installedVersionLabel;
+  updModalNotes.innerHTML = notesHtml;
+
+  // Panel en "Acerca de"
+  aboutUpdVer.textContent = versionLabel;
+  aboutUpdNotes.innerHTML = notesHtml;
+  aboutUpdPanel.classList.remove('hidden');
+  aboutInstallBtn.classList.remove('hidden');
+
+  // Mensaje de status redundante (oculto si el panel ya lo muestra)
+  setAboutStatus('Hay una actualización descargada lista para aplicar.', 'alert-success');
+
+  if (showModal && updateModalShownFor !== versionLabel) {
+    updateModalShownFor = versionLabel;
+    openUpdateModal();
+  }
+}
+
+async function installUpdateNow(btn) {
+  const original = btn ? btn.textContent : null;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Reiniciando…';
+  }
+  const r = await window.api.installUpdate();
+  if (!r || r.ok === false) {
+    if (btn) {
+      btn.disabled = false;
+      if (original) btn.textContent = original;
+    }
+    setAboutStatus(r?.error || 'No se pudo iniciar la instalación.', 'alert-error');
+  }
+  // Si ok=true, la app está cerrándose; no hace falta más feedback.
+}
+
+updModalInstall.addEventListener('click', () => installUpdateNow(updModalInstall));
+aboutInstallBtn.addEventListener('click', () => installUpdateNow(aboutInstallBtn));
+
 async function loadAboutInfo() {
   const res = await window.api.getVersionInfo();
   if (!res?.ok || !res.info) return;
   const info = res.info;
+  installedVersionLabel = `v${info.version}`;
   aboutName.textContent     = info.name || 'Onix';
-  aboutVersion.textContent  = `v${info.version}${info.packaged ? '' : ' (desarrollo)'}`;
+  aboutVersion.textContent  = `${installedVersionLabel}${info.packaged ? '' : ' (desarrollo)'}`;
   aboutPlatform.textContent = `${PLATFORM_LABELS[info.platform] || info.platform} · ${info.arch}`;
   aboutElectron.textContent = `Electron ${info.electron} · Node ${info.node}`;
   aboutFeed.textContent     = info.feedRepo ? `GitHub Releases (${info.feedRepo})` : '—';
   if (info.alreadyDownloaded) {
-    const name = info.alreadyDownloaded.releaseName;
-    setAboutStatus(
-      name
-        ? `Hay una actualización ${name} descargada. Se aplicará al reiniciar la app.`
-        : 'Hay una actualización descargada. Se aplicará al reiniciar la app.',
-      'alert-success'
-    );
+    // Si al cargar la vista ya existe una actualización descargada, mostramos
+    // el panel y el modal (una sola vez por sesión).
+    applyDownloadedUpdate(info.alreadyDownloaded, { showModal: true });
   }
 }
 
@@ -2513,16 +2659,12 @@ aboutCheckBtn.addEventListener('click', async () => {
     case 'available':
       setAboutStatus('Hay una nueva versión disponible. Descargando en segundo plano…', 'alert-info');
       break;
-    case 'downloaded': {
-      const name = res.releaseName;
-      setAboutStatus(
-        name
-          ? `Actualización ${name} lista. Se aplicará al reiniciar la app.`
-          : 'Actualización lista. Se aplicará al reiniciar la app.',
-        'alert-success'
-      );
+    case 'downloaded':
+      applyDownloadedUpdate({
+        releaseName: res.releaseName,
+        releaseNotes: res.releaseNotes,
+      }, { showModal: true });
       break;
-    }
     case 'unsupported':
       setAboutStatus(res.error || 'Esta función no está disponible en este entorno.', 'alert-info');
       break;
@@ -2535,6 +2677,30 @@ aboutCheckBtn.addEventListener('click', async () => {
       break;
   }
 });
+
+// Listener push: cuando el main descarga una nueva versión en segundo plano,
+// abrimos el modal automáticamente (una sola vez por versión).
+if (window.api.onUpdateDownloaded) {
+  window.api.onUpdateDownloaded((payload) => {
+    applyDownloadedUpdate(payload, { showModal: true });
+  });
+}
+
+// Inicialización temprana: cargamos versión instalada y, si ya hay una
+// actualización descargada al abrir el dashboard, mostramos el modal aunque
+// el usuario nunca entre a "Configuración → Acerca de".
+(async function initUpdateBootstrap() {
+  try {
+    const info = await window.api.getVersionInfo();
+    if (info?.ok && info.info) {
+      installedVersionLabel = `v${info.info.version}`;
+    }
+    const dl = await window.api.getDownloadedUpdate();
+    if (dl?.ok && dl.update) {
+      applyDownloadedUpdate(dl.update, { showModal: true });
+    }
+  } catch (_) { /* silencio: módulo opcional */ }
+})();
 
 // ── Reporte 4: Horas dentro/fuera ─────────────────────────────
 const repHdIni     = document.getElementById('rep-hd-ini');

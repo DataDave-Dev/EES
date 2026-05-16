@@ -718,8 +718,28 @@
               <dt>Origen de actualizaciones</dt><dd id="about-feed">—</dd>
             </dl>
             <div id="about-update-status" class="alert-info hidden" style="margin-top: 12px;"></div>
+
+            <div id="about-update-panel" class="about-update-panel hidden" style="margin-top: 14px;">
+              <div class="about-update-head">
+                <div class="about-update-badge" aria-hidden="true">
+                  <span id="icon-about-update"></span>
+                </div>
+                <div class="about-update-info">
+                  <div class="about-update-title">
+                    Nueva versión <span id="about-update-version">—</span> descargada
+                  </div>
+                  <div class="about-update-sub">Reinicia la aplicación para aplicar la actualización.</div>
+                </div>
+              </div>
+              <div class="about-update-notes-wrap">
+                <div class="settings-section-title">Cambios incluidos</div>
+                <div id="about-update-notes" class="update-notes update-notes--compact">—</div>
+              </div>
+            </div>
+
             <div class="cfg-actions">
               <button type="button" id="about-check-btn" class="btn-primary btn-primary--auto">Buscar actualizaciones</button>
+              <button type="button" id="about-install-btn" class="btn-primary btn-primary--auto hidden">Reiniciar e instalar</button>
             </div>
           </div>
         </section>
@@ -1044,6 +1064,39 @@
       <footer class="modal-foot">
         <button type="button" class="btn-ghost-outline" data-delmodal-close>Cancelar</button>
         <button type="submit" form="evt-del-form" id="evt-del-submit" class="btn-primary btn-primary--auto" style="background: var(--error);">Eliminar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Update available modal -->
+  <div id="update-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+    <div class="modal update-modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="update-modal-title">Actualización disponible</h2>
+        <button type="button" class="modal-close-btn" data-updmodal-close aria-label="Cerrar">
+          <span id="icon-updmodal-close"></span>
+        </button>
+      </header>
+      <div class="modal-body update-modal-body">
+        <div class="update-hero">
+          <div class="update-hero-badge" aria-hidden="true">
+            <span id="icon-update-hero"></span>
+          </div>
+          <div class="update-hero-text">
+            <div class="update-hero-title">Nueva versión <span id="update-modal-version">—</span> lista para instalar</div>
+            <div class="update-hero-sub">
+              Actualmente tienes la versión <span id="update-modal-current">—</span>. Reinicia la aplicación para aplicar la actualización.
+            </div>
+          </div>
+        </div>
+        <div class="update-section">
+          <div class="settings-section-title">Novedades de esta versión</div>
+          <div id="update-modal-notes" class="update-notes">—</div>
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-updmodal-close>Más tarde</button>
+        <button type="button" id="update-modal-install" class="btn-primary btn-primary--auto">Reiniciar e instalar</button>
       </footer>
     </div>
   </div>

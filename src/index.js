@@ -12,6 +12,7 @@ if (require('electron-squirrel-startup')) {
 if (app.isPackaged && process.platform === 'win32') {
   const { updateElectronApp, UpdateSourceType } = require('update-electron-app');
   const { attachPersistentListeners } = require('./main/updater');
+  // Engancha listeners ANTES de iniciar el chequeo para no perder eventos.
   attachPersistentListeners();
   updateElectronApp({
     updateSource: {
@@ -19,7 +20,9 @@ if (app.isPackaged && process.platform === 'win32') {
       repo: 'DataDave-Dev/EES',
     },
     updateInterval: '1 hour',
-    notifyUser: true,
+    // Desactivamos el diálogo nativo en inglés ("Restart / Later"); la app
+    // muestra su propio modal en español con las notas del release.
+    notifyUser: false,
   });
 }
 

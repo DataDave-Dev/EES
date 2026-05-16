@@ -85,4 +85,16 @@ contextBridge.exposeInMainWorld('api', {
   // App / actualizaciones remotas
   getVersionInfo: () => ipcRenderer.invoke('app:getVersionInfo'),
   checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+  getDownloadedUpdate: () => ipcRenderer.invoke('app:getDownloadedUpdate'),
+  installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
+  onUpdateDownloaded: (cb) => {
+    const handler = (_e, payload) => { try { cb(payload); } catch (_) {} };
+    ipcRenderer.on('update:downloaded', handler);
+    return () => ipcRenderer.removeListener('update:downloaded', handler);
+  },
+  onUpdateStatus: (cb) => {
+    const handler = (_e, payload) => { try { cb(payload); } catch (_) {} };
+    ipcRenderer.on('update:status', handler);
+    return () => ipcRenderer.removeListener('update:status', handler);
+  },
 });

@@ -693,6 +693,8 @@ function registerIpc() {
   // Información de la app y actualizaciones remotas.
   ipcMain.handle('app:getVersionInfo', safe(async () => ({ ok: true, info: updater.getVersionInfo() })));
   ipcMain.handle('app:checkForUpdates', safe(async () => updater.checkForUpdates()));
+  ipcMain.handle('app:getDownloadedUpdate', safe(async () => ({ ok: true, update: updater.getDownloadedUpdate() })));
+  ipcMain.handle('app:installUpdate', safe(async () => updater.quitAndInstall()));
 }
 
 module.exports = { registerIpc, VIEW_SIZES };
