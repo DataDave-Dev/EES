@@ -15,10 +15,11 @@
     "watch:css": "tailwindcss -i ./src/styles/input.css -o ./src/styles/output.css --watch",
     "rebuild": "electron-rebuild -f -w better-sqlite3,bcrypt",
     "fix-squirrel": "node scripts/fix-squirrel.js",
+    "generate-icon": "node scripts/generate-icon.js",
     "postinstall": "node scripts/fix-squirrel.js",
-    "package": "npm run build:css && electron-forge package",
-    "make": "npm run build:css && npm run fix-squirrel && electron-forge make",
-    "publish": "npm run fix-squirrel && electron-forge publish",
+    "package": "npm run build:css && npm run generate-icon && electron-forge package",
+    "make": "npm run build:css && npm run generate-icon && npm run fix-squirrel && electron-forge make",
+    "publish": "npm run generate-icon && npm run fix-squirrel && electron-forge publish",
     "lint": "echo \"No linting configured\""
   },
   "keywords": [],
@@ -46,6 +47,7 @@
     "@electron/fuses": "^1.8.0",
     "@electron/rebuild": "^3.7.0",
     "electron": "33.4.11",
+    "png-to-ico": "^3.0.1",
     "tailwindcss": "^3.4.14"
   }
 }

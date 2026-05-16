@@ -38,6 +38,7 @@ function createWindow() {
     maximizable: size.resizable,
     backgroundColor: '#eeece6',
     autoHideMenuBar: true,
+    icon: path.join(__dirname, 'assets', 'logo', process.platform === 'win32' ? 'icon.ico' : 'logo.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
