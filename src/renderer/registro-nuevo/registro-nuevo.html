@@ -26,11 +26,22 @@
 
         <!-- Fecha y hora -->
         <div class="reg-section reg-section--clock">
-          <span class="reg-section-label">Fecha y hora</span>
-          <div class="reg-clock-text">
-            <span id="reg-now-time">—:—:—</span>
-            <span id="reg-now-date">—</span>
+          <div class="reg-section-head">
+            <span class="reg-section-label">Fecha y hora</span>
+            <button type="button" id="reg-now-reset" class="reg-section-link" title="Usar la hora actual">
+              <span id="reg-now-reset-icon"></span>
+              <span>Ahora</span>
+            </button>
           </div>
+          <div class="reg-clock-grid">
+            <span class="field-shell">
+              <input type="date" id="reg-now-date" class="field-input reg-clock-input" />
+            </span>
+            <span class="field-shell">
+              <input type="time" id="reg-now-time" class="field-input reg-clock-input" step="60" />
+            </span>
+          </div>
+          <span class="field-hint" id="reg-now-hint">Se autocompleta con la hora actual; puedes ajustarla.</span>
         </div>
 
         <!-- Empleado -->

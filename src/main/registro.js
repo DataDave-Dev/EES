@@ -19,6 +19,10 @@ function stmts() {
       INSERT INTO registro_eventos (empleado_id, tipo, registrado_por, motivo_tipo, motivo_detalle)
       VALUES (?, ?, ?, ?, ?)
     `),
+    insertWithTs: db.prepare(`
+      INSERT INTO registro_eventos (empleado_id, tipo, registrado_por, motivo_tipo, motivo_detalle, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `),
     findById: db.prepare(`
       SELECT id, empleado_id, tipo, timestamp, registrado_por, motivo_tipo, motivo_detalle
       FROM registro_eventos WHERE id = ?
@@ -58,7 +62,7 @@ function getEmpleadoStatus(empleadoId) {
   };
 }
 
-function markEvent(empleadoId, registradoPorId, tipo, motivoInfo) {
+function markEvent(empleadoId, registradoPorId, tipo, motivoInfo, timestamp) {
   const emp = empleados.findById(empleadoId);
   if (!emp) return { ok: false, error: 'Empleado no encontrado' };
   if (emp.estatus !== 'activo') {
@@ -92,8 +96,22 @@ function markEvent(empleadoId, registradoPorId, tipo, motivoInfo) {
   }
   if (d) motivoDetalle = d;
 
+  // Timestamp opcional: si viene, se valida y se persiste en UTC ('YYYY-MM-DD HH:MM:SS').
+  // Si no, se usa el default de SQLite (CURRENT_TIMESTAMP, también UTC).
+  let normalizedTs = null;
+  if (timestamp != null && String(timestamp).trim() !== '') {
+    const ts = String(timestamp).trim();
+    if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(ts)) {
+      return { ok: false, error: 'Fecha y hora no válidas' };
+    }
+    normalizedTs = ts.replace('T', ' ').slice(0, 19) +
+      (ts.length === 16 || ts.length === 17 ? ':00' : '');
+  }
+
   const s = stmts();
-  const info = s.insert.run(emp.id, resolvedTipo, registradoPorId, motivoTipo, motivoDetalle);
+  const info = normalizedTs
+    ? s.insertWithTs.run(emp.id, resolvedTipo, registradoPorId, motivoTipo, motivoDetalle, normalizedTs)
+    : s.insert.run(emp.id, resolvedTipo, registradoPorId, motivoTipo, motivoDetalle);
   const evento = s.findById.get(info.lastInsertRowid);
 
   return { ok: true, evento, empleado: empleados.publicEmpleado(emp) };

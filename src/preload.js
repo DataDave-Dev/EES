@@ -27,8 +27,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('empleados:setEstatus', { id, estatus }),
 
   getEmpleadoStatus: (id) => ipcRenderer.invoke('registro:getEmpleadoStatus', { id }),
-  markEvent: (id, tipo, salida) =>
-    ipcRenderer.invoke('registro:markEvent', { id, tipo, salida }),
+  markEvent: (id, tipo, salida, timestamp) =>
+    ipcRenderer.invoke('registro:markEvent', { id, tipo, salida, timestamp }),
   listTodayEvents: () => ipcRenderer.invoke('registro:listToday'),
   updateEvent: (id, payload, password) =>
     ipcRenderer.invoke('registro:updateEvent', { id, payload, password }),

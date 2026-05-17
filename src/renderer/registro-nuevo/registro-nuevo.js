@@ -34,6 +34,7 @@ document.getElementById('reg-quick-add-icon').innerHTML = I.plus(13);
 document.getElementById('reg-tipo-add-icon').innerHTML = I.plus(13);
 document.getElementById('icon-tipomodal-close').innerHTML = I.close(16);
 document.getElementById('icon-empmodal-close').innerHTML = I.close(16);
+document.getElementById('reg-now-reset-icon').innerHTML = I.refresh(13);
 
 // ── Refs ──────────────────────────────────────────────────────
 const regSearchInput = document.getElementById('reg-search');
@@ -57,16 +58,62 @@ let regSearchTimer = null;
 let regSelectedEmpleado = null;
 let regLastEventToday = null;
 
-// ── Live clock ────────────────────────────────────────────────
-function tick() {
-  const now = new Date();
-  regNowDate.textContent = now.toLocaleDateString('es-MX', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
-  regNowTime.textContent = window.EES_TIME.fmtClockSeconds(now);
+// ── Live clock (inputs editables) ─────────────────────────────
+// Los inputs se autocompletan con la hora actual cada segundo mientras el
+// usuario no los haya editado. En cuanto edita uno, se "congela" y deja de
+// auto-actualizarse. El botón "Ahora" resincroniza ambos al instante.
+const regNowReset = document.getElementById('reg-now-reset');
+let regNowEdited = false;
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function localDateStr(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
-tick();
+function localTimeStr(d) {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function fillNowInputs() {
+  const now = new Date();
+  regNowDate.value = localDateStr(now);
+  regNowTime.value = localTimeStr(now);
+}
+
+function tick() {
+  if (regNowEdited) return;
+  fillNowInputs();
+}
+fillNowInputs();
 setInterval(tick, 1000);
+
+regNowDate.addEventListener('input', () => { regNowEdited = true; });
+regNowTime.addEventListener('input', () => { regNowEdited = true; });
+regNowReset.addEventListener('click', () => {
+  regNowEdited = false;
+  fillNowInputs();
+});
+
+// Construye 'YYYY-MM-DD HH:MM:SS' en UTC a partir de los inputs locales.
+// Devuelve null si el usuario no ha editado (para que el backend use el default).
+function buildTimestampUtc() {
+  if (!regNowEdited) return null;
+  const date = regNowDate.value;
+  const time = regNowTime.value;
+  if (!date || !time) return { error: 'Fecha y hora son requeridas.' };
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const t = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!m || !t) return { error: 'Fecha y hora no válidas.' };
+  const local = new Date(
+    Number(m[1]), Number(m[2]) - 1, Number(m[3]),
+    Number(t[1]), Number(t[2]), 0, 0
+  );
+  if (Number.isNaN(local.getTime())) return { error: 'Fecha y hora no válidas.' };
+  const u = local;
+  return (
+    `${u.getUTCFullYear()}-${pad2(u.getUTCMonth() + 1)}-${pad2(u.getUTCDate())} ` +
+    `${pad2(u.getUTCHours())}:${pad2(u.getUTCMinutes())}:${pad2(u.getUTCSeconds())}`
+  );
+}
 
 // ── Salida tipos catalog ──────────────────────────────────────
 async function loadSalidaTipos(preselect = null) {
@@ -242,9 +289,15 @@ async function markRegistro(tipo) {
   // motivo + detalle aplican a ambos tipos; vacíos = no se registra motivo.
   const motivo = (t || d) ? { tipo: t, detalle: d } : null;
 
+  const ts = buildTimestampUtc();
+  if (ts && typeof ts === 'object' && ts.error) {
+    alert(ts.error);
+    return;
+  }
+
   regBtnIn.disabled = true;
   regBtnOut.disabled = true;
-  const res = await window.api.markEvent(regSelectedEmpleado.id, tipo, motivo);
+  const res = await window.api.markEvent(regSelectedEmpleado.id, tipo, motivo, ts || undefined);
   if (!res?.ok) {
     alert(res?.error || 'No se pudo registrar el evento');
     regBtnIn.disabled = false;

@@ -354,9 +354,9 @@ function registerIpc() {
 
   ipcMain.handle(
     'registro:markEvent',
-    requirePerm('registro', async (_e, { id, tipo, salida } = {}) => {
+    requirePerm('registro', async (_e, { id, tipo, salida, timestamp } = {}) => {
       const u = auth.getCurrentUser();
-      const r = registro.markEvent(id, u.id, tipo, salida);
+      const r = registro.markEvent(id, u.id, tipo, salida, timestamp);
       if (r?.ok && r.evento) {
         const ev = r.evento;
         const emp = r.empleado;
