@@ -1993,7 +1993,11 @@ input:-webkit-autofill {
     transition: background 120ms ease;
   }
   .reg-result-card:last-child { border-bottom: 0; }
-  .reg-result-card:hover { background: var(--hover); }
+  .reg-result-card:hover,
+  .reg-result-card.is-active {
+    background: var(--accent-soft);
+  }
+  .reg-result-card.is-active { outline: none; }
   .reg-result-num {
     font-family: 'Geist Mono', monospace;
     font-size: 12px;

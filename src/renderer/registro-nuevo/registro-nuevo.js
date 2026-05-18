@@ -128,12 +128,22 @@ async function loadSalidaTipos(preselect = null) {
 loadSalidaTipos();
 
 // ── Modal focus management (a11y) ─────────────────────────────
+// rememberFocus guarda el último elemento con foco antes de abrir el modal.
+// activateModal habilita el focus-trap (Tab/Shift+Tab circulan dentro).
+// restoreFocus libera el trap y devuelve el foco al elemento previo.
 const _modalLastFocus = new WeakMap();
+const _modalTrapRelease = new WeakMap();
 function rememberFocus(modal) {
   const el = document.activeElement;
   if (el && el !== document.body) _modalLastFocus.set(modal, el);
 }
+function activateModal(modal) {
+  const release = window.EES_FOCUS_TRAP.trap(modal);
+  _modalTrapRelease.set(modal, release);
+}
 function restoreFocus(modal) {
+  const release = _modalTrapRelease.get(modal);
+  if (release) { release(); _modalTrapRelease.delete(modal); }
   const prev = _modalLastFocus.get(modal);
   _modalLastFocus.delete(modal);
   if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
@@ -147,6 +157,7 @@ function openTipoModal() {
   regTipoInput.value = '';
   rememberFocus(regTipoModal);
   regTipoModal.classList.remove('hidden');
+  activateModal(regTipoModal);
   setTimeout(() => regTipoInput.focus(), 30);
 }
 function closeTipoModal() {
@@ -188,14 +199,38 @@ regTipoForm.addEventListener('submit', async (e) => {
 });
 
 // ── Empleado search + selection ───────────────────────────────
-function renderSearchResults(list) {
-  if (!list.length) {
-    regResults.innerHTML = '<div class="reg-empty">Sin coincidencias.</div>';
-    regResults.classList.remove('hidden');
+let regComboActive = -1;
+
+function setComboActive(idx) {
+  const opts = regResults.querySelectorAll('button.reg-result-card');
+  if (!opts.length) {
+    regComboActive = -1;
+    regSearchInput.removeAttribute('aria-activedescendant');
     return;
   }
-  regResults.innerHTML = list.map((e) => `
-    <button type="button" class="reg-result-card" data-id="${e.id}">
+  regComboActive = ((idx % opts.length) + opts.length) % opts.length;
+  opts.forEach((el, i) => {
+    el.classList.toggle('is-active', i === regComboActive);
+    el.setAttribute('aria-selected', i === regComboActive ? 'true' : 'false');
+  });
+  const active = opts[regComboActive];
+  if (active) {
+    regSearchInput.setAttribute('aria-activedescendant', active.id);
+    active.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function renderSearchResults(list) {
+  if (!list.length) {
+    regResults.innerHTML = '<div class="reg-empty" role="status">Sin coincidencias.</div>';
+    regResults.classList.remove('hidden');
+    regSearchInput.setAttribute('aria-expanded', 'true');
+    regSearchInput.removeAttribute('aria-activedescendant');
+    regComboActive = -1;
+    return;
+  }
+  regResults.innerHTML = list.map((e, idx) => `
+    <button type="button" class="reg-result-card" data-id="${e.id}" id="reg-result-opt-${idx}" role="option" aria-selected="false">
       <span class="reg-result-num">#${escapeHtml(e.numero_empleado)}</span>
       <span>
         <div class="reg-result-name">${escapeHtml(e.nombre)} ${escapeHtml(e.apellidos)}</div>
@@ -206,11 +241,16 @@ function renderSearchResults(list) {
     </button>
   `).join('');
   regResults.classList.remove('hidden');
+  regSearchInput.setAttribute('aria-expanded', 'true');
+  regComboActive = -1;
 }
 
 function clearSearchResults() {
   regResults.innerHTML = '';
   regResults.classList.add('hidden');
+  regSearchInput.setAttribute('aria-expanded', 'false');
+  regSearchInput.removeAttribute('aria-activedescendant');
+  regComboActive = -1;
 }
 
 function renderSelected() {
@@ -283,6 +323,36 @@ regResults.addEventListener('click', (e) => {
   const btn = e.target.closest('button.reg-result-card');
   if (!btn) return;
   selectEmpleado(Number(btn.dataset.id));
+});
+
+regSearchInput.addEventListener('keydown', (e) => {
+  const open = !regResults.classList.contains('hidden');
+  const opts = regResults.querySelectorAll('button.reg-result-card');
+  if (e.key === 'ArrowDown') {
+    if (!open || !opts.length) return;
+    e.preventDefault();
+    setComboActive(regComboActive < 0 ? 0 : regComboActive + 1);
+  } else if (e.key === 'ArrowUp') {
+    if (!open || !opts.length) return;
+    e.preventDefault();
+    setComboActive(regComboActive < 0 ? opts.length - 1 : regComboActive - 1);
+  } else if (e.key === 'Enter') {
+    if (!open || regComboActive < 0 || !opts.length) return;
+    e.preventDefault();
+    selectEmpleado(Number(opts[regComboActive].dataset.id));
+  } else if (e.key === 'Escape') {
+    if (open) {
+      e.preventDefault();
+      e.stopPropagation();
+      clearSearchResults();
+    }
+  } else if (e.key === 'Home' && open && opts.length) {
+    e.preventDefault();
+    setComboActive(0);
+  } else if (e.key === 'End' && open && opts.length) {
+    e.preventDefault();
+    setComboActive(opts.length - 1);
+  }
 });
 
 document.addEventListener('click', (e) => {
@@ -359,6 +429,7 @@ function openEmpleadoModal() {
   emError.textContent = '';
   rememberFocus(empleadoModal);
   empleadoModal.classList.remove('hidden');
+  activateModal(empleadoModal);
   setTimeout(() => emNombre.focus(), 30);
 }
 function closeEmpleadoModal() {

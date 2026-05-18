@@ -26,7 +26,12 @@ let currentUser = null;
 // Recuerda el elemento enfocado antes de abrir un modal y lo restaura al
 // cerrar, para que el lector de pantalla y el foco visible vuelvan al boton
 // que abrio el modal (mejor accesibilidad y navegacion por teclado).
+//
+// Adicionalmente, un MutationObserver al final de bootstrap aplica/libera
+// focus-trap automaticamente cuando un .modal-backdrop pierde o gana la
+// clase 'hidden' — asi no hay que tocar cada open*/close*.
 const _modalLastFocus = new WeakMap();
+const _modalTrapRelease = new WeakMap();
 function rememberFocus(modal) {
   const el = document.activeElement;
   if (el && el !== document.body) _modalLastFocus.set(modal, el);
@@ -38,6 +43,38 @@ function restoreFocus(modal) {
     setTimeout(() => prev.focus(), 0);
   }
 }
+
+// Aplica/libera focus-trap segun el estado visible del modal.
+function _onModalVisibilityChange(modal) {
+  const isOpen = !modal.classList.contains('hidden');
+  const existing = _modalTrapRelease.get(modal);
+  if (isOpen && !existing) {
+    const release = window.EES_FOCUS_TRAP.trap(modal);
+    _modalTrapRelease.set(modal, release);
+  } else if (!isOpen && existing) {
+    existing();
+    _modalTrapRelease.delete(modal);
+  }
+}
+
+function installModalFocusTraps() {
+  const modals = document.querySelectorAll('.modal-backdrop');
+  modals.forEach((m) => {
+    _onModalVisibilityChange(m);
+    const obs = new MutationObserver(() => _onModalVisibilityChange(m));
+    obs.observe(m, { attributes: true, attributeFilter: ['class'] });
+  });
+}
+
+// Esc global cierra el primer modal visible.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const openModal = Array.from(document.querySelectorAll('.modal-backdrop'))
+    .find((m) => !m.classList.contains('hidden'));
+  if (!openModal) return;
+  const closeBtn = openModal.querySelector('[data-evtmodal-close], [data-delmodal-close], [data-inadelmodal-close], [data-minamodal-close], [data-tipomodal-close], [data-empmodal-close], [data-userclose], [data-updmodal-close], [data-audmodal-close], [data-hdmodal-close], .modal-close-btn');
+  if (closeBtn) { e.preventDefault(); closeBtn.click(); }
+});
 
 // ── Hydrate user info ─────────────────────────────────────────
 async function loadUser() {
@@ -81,6 +118,7 @@ function applyPermissionGating() {
 }
 
 loadUser();
+installModalFocusTraps();
 
 // ── Dashboard view ────────────────────────────────────────────
 const dashKpiActivos = document.getElementById('dash-kpi-activos');

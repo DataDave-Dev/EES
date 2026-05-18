@@ -42,9 +42,14 @@
                 placeholder="Buscar por número o nombre…"
                 autocomplete="off"
                 spellcheck="false"
+                role="combobox"
+                aria-controls="ina-results"
+                aria-expanded="false"
+                aria-autocomplete="list"
+                aria-label="Buscar empleado"
               />
             </div>
-            <div id="ina-results" class="reg-results hidden"></div>
+            <div id="ina-results" class="reg-results hidden" role="listbox" aria-label="Resultados de empleados"></div>
             <div id="ina-selected" class="reg-selected hidden"></div>
           </div>
         </section>
@@ -170,6 +175,7 @@
   <script src="../shared/brand.js"></script>
   <script src="../shared/time.js"></script>
   <script src="../shared/toast.js"></script>
+  <script src="../shared/focus-trap.js"></script>
   <script src="inasistencia-nuevo.js"></script>
 </body>
 </html>

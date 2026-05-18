@@ -137,14 +137,38 @@ function filterEmpleados(q) {
   }).slice(0, 8);
 }
 
-function renderResults(list) {
-  if (!list.length) {
-    resultsBox.innerHTML = '<div class="reg-empty">Sin coincidencias.</div>';
-    resultsBox.classList.remove('hidden');
+let inaComboActive = -1;
+
+function setComboActive(idx) {
+  const opts = resultsBox.querySelectorAll('button.reg-result-card');
+  if (!opts.length) {
+    inaComboActive = -1;
+    searchInput.removeAttribute('aria-activedescendant');
     return;
   }
-  resultsBox.innerHTML = list.map((e) => `
-    <button type="button" class="reg-result-card" data-id="${e.id}">
+  inaComboActive = ((idx % opts.length) + opts.length) % opts.length;
+  opts.forEach((el, i) => {
+    el.classList.toggle('is-active', i === inaComboActive);
+    el.setAttribute('aria-selected', i === inaComboActive ? 'true' : 'false');
+  });
+  const active = opts[inaComboActive];
+  if (active) {
+    searchInput.setAttribute('aria-activedescendant', active.id);
+    active.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function renderResults(list) {
+  if (!list.length) {
+    resultsBox.innerHTML = '<div class="reg-empty" role="status">Sin coincidencias.</div>';
+    resultsBox.classList.remove('hidden');
+    searchInput.setAttribute('aria-expanded', 'true');
+    searchInput.removeAttribute('aria-activedescendant');
+    inaComboActive = -1;
+    return;
+  }
+  resultsBox.innerHTML = list.map((e, idx) => `
+    <button type="button" class="reg-result-card" data-id="${e.id}" id="ina-result-opt-${idx}" role="option" aria-selected="false">
       <span class="reg-result-num">#${escapeHtml(e.numero_empleado)}</span>
       <span>
         <div class="reg-result-name">${escapeHtml(e.nombre)} ${escapeHtml(e.apellidos)}</div>
@@ -152,11 +176,16 @@ function renderResults(list) {
     </button>
   `).join('');
   resultsBox.classList.remove('hidden');
+  searchInput.setAttribute('aria-expanded', 'true');
+  inaComboActive = -1;
 }
 
 function clearResults() {
   resultsBox.innerHTML = '';
   resultsBox.classList.add('hidden');
+  searchInput.setAttribute('aria-expanded', 'false');
+  searchInput.removeAttribute('aria-activedescendant');
+  inaComboActive = -1;
 }
 
 function renderSelected() {
@@ -189,15 +218,48 @@ searchInput.addEventListener('input', () => {
   }, 100);
 });
 
-resultsBox.addEventListener('click', (e) => {
-  const btn = e.target.closest('button.reg-result-card');
-  if (!btn) return;
-  const id = Number(btn.dataset.id);
+function pickEmpleadoById(id) {
   selected = activeEmpleados.find((x) => x.id === id) || null;
   searchInput.value = '';
   clearResults();
   renderSelected();
   updateUI();
+}
+
+resultsBox.addEventListener('click', (e) => {
+  const btn = e.target.closest('button.reg-result-card');
+  if (!btn) return;
+  pickEmpleadoById(Number(btn.dataset.id));
+});
+
+searchInput.addEventListener('keydown', (e) => {
+  const open = !resultsBox.classList.contains('hidden');
+  const opts = resultsBox.querySelectorAll('button.reg-result-card');
+  if (e.key === 'ArrowDown') {
+    if (!open || !opts.length) return;
+    e.preventDefault();
+    setComboActive(inaComboActive < 0 ? 0 : inaComboActive + 1);
+  } else if (e.key === 'ArrowUp') {
+    if (!open || !opts.length) return;
+    e.preventDefault();
+    setComboActive(inaComboActive < 0 ? opts.length - 1 : inaComboActive - 1);
+  } else if (e.key === 'Enter') {
+    if (!open || inaComboActive < 0 || !opts.length) return;
+    e.preventDefault();
+    pickEmpleadoById(Number(opts[inaComboActive].dataset.id));
+  } else if (e.key === 'Escape') {
+    if (open) {
+      e.preventDefault();
+      e.stopPropagation();
+      clearResults();
+    }
+  } else if (e.key === 'Home' && open && opts.length) {
+    e.preventDefault();
+    setComboActive(0);
+  } else if (e.key === 'End' && open && opts.length) {
+    e.preventDefault();
+    setComboActive(opts.length - 1);
+  }
 });
 
 document.addEventListener('click', (e) => {
