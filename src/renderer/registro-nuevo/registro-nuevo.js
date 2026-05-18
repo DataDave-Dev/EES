@@ -217,12 +217,12 @@ function renderSelected() {
   if (!regSelectedEmpleado) {
     regSelected.classList.add('hidden');
     regSelected.innerHTML = '';
-    regSalidaFields.classList.add('hidden');
+    regSalidaFields.classList.add('reg-step--disabled');
     regBtnIn.disabled = true;
     regBtnOut.disabled = true;
     return;
   }
-  regSalidaFields.classList.remove('hidden');
+  regSalidaFields.classList.remove('reg-step--disabled');
   const e = regSelectedEmpleado;
   const metaParts = [`#${e.numero_empleado}`];
   if (e.puesto) metaParts.push(e.puesto);

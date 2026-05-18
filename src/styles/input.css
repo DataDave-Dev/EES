@@ -98,6 +98,39 @@
 }
 
 /* ─────────────────────────────────────────────
+   Custom scrollbar (Chromium + Firefox)
+   Aplica a todo contenedor con scroll. Mantiene el ancho del scrollbar
+   constante (10px) y usa los colores del tema para que no rompa la estética.
+   ───────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 160ms ease;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+*::-webkit-scrollbar-thumb:active {
+  background-color: var(--accent);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ─────────────────────────────────────────────
    Base
    ───────────────────────────────────────────── */
 html,
@@ -1518,54 +1551,109 @@ input:-webkit-autofill {
     color: var(--text);
   }
   .regn-main {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 32px 28px 40px;
-    display: flex;
-    justify-content: center;
+    /* Bloque + centrado con margin auto. Evita el bug de flex que recortaba el
+       scroll vertical cuando el contenido superaba la altura del viewport. */
+    display: block;
+    scrollbar-gutter: stable;
+  }
+  .regn-card { margin: 0 auto; }
+  @media (max-height: 720px) {
+    .regn-main { padding: 18px 24px 28px; }
+    .regn-card { padding: 20px 24px; gap: 14px; }
+  }
+  @media (max-height: 560px) {
+    .regn-main { padding: 12px 20px 20px; }
+    .regn-card { padding: 16px 20px; gap: 12px; }
+    .reg-step { padding: 12px 14px 14px; gap: 10px; }
   }
   .regn-card {
     width: 100%;
-    max-width: 1100px;
-    padding: 28px 32px 28px;
+    max-width: 960px;
+    padding: 28px 32px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 18px;
   }
-  .regn-form-grid {
+
+  /* Wizard-style stepped form */
+  .reg-steps-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 24px;
+    gap: 14px;
   }
-  .regn-col { display: flex; flex-direction: column; gap: 22px; }
-  @media (min-width: 900px) {
-    .regn-form-grid {
-      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-      column-gap: 32px;
-      align-items: start;
+  @media (min-width: 820px) {
+    .reg-steps-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 16px;
+      align-items: stretch;
     }
   }
 
-  /* Sectioned form layout */
-  .reg-section {
+  .reg-step {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 18px 18px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    transition: opacity 160ms ease, border-color 160ms ease, background 160ms ease;
+  }
+  .reg-step:focus-within {
+    border-color: var(--accent-ring);
+  }
+  .reg-step--disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .reg-step--disabled .reg-section-link { visibility: hidden; }
+
+  .reg-step-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 24px;
+  }
+  .reg-step-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .reg-step-num {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    background: var(--accent);
+    color: #fff;
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .reg-step-label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    color: var(--text);
+  }
+  .reg-step-body {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
-  .reg-section-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .reg-section-label {
-    font-family: 'Geist Mono', monospace;
-    font-size: 10.5px;
-    font-weight: 500;
-    letter-spacing: 0.7px;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
+
+  /* Legacy section helpers kept for the "Nuevo motivo" link inside step head */
   .reg-section-link {
     display: inline-flex;
     align-items: center;
@@ -1581,17 +1669,15 @@ input:-webkit-autofill {
   }
   .reg-section-link:hover { text-decoration: underline; }
 
-  .reg-section--clock {
-    gap: 8px;
-  }
   .reg-clock-grid {
     display: grid;
-    grid-template-columns: 1.2fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
   }
-  @media (max-width: 560px) {
+  @media (max-width: 480px) {
     .reg-clock-grid { grid-template-columns: 1fr; }
   }
+  .reg-clock-field { gap: 4px; }
   .reg-clock-input {
     font-family: 'Geist Mono', monospace;
     font-variant-numeric: tabular-nums;
@@ -1603,18 +1689,19 @@ input:-webkit-autofill {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
   }
-  @media (max-width: 560px) {
+  @media (max-width: 700px) {
     .reg-motivo-grid { grid-template-columns: 1fr; }
   }
+
   .reg-actions-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
-    margin-top: 4px;
+    margin-top: 6px;
     width: 100%;
-    max-width: 720px;
-    margin-left: auto;
-    margin-right: auto;
+  }
+  @media (max-width: 480px) {
+    .reg-actions-grid { grid-template-columns: 1fr; }
   }
   /* Themed <select> — neutralize native styling, follow theme */
   .field-select {
@@ -1862,6 +1949,35 @@ input:-webkit-autofill {
   .reg-action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
   .reg-action-btn--in  { background: var(--success); }
   .reg-action-btn--out { background: var(--error); }
+
+  /* Ghost variant: neutral secondary action (Cancel, etc.) */
+  .ina-action-btn--ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+  }
+  .ina-action-btn--ghost:hover:not(:disabled) {
+    background: var(--hover);
+    color: var(--text);
+    filter: none;
+  }
+
+  /* Evidencia: row de acciones (cargar/quitar) */
+  .ina-evidencia-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .ina-evidencia-upload {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
 
   .reg-empty {
     padding: 36px 28px;
