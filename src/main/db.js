@@ -18,6 +18,14 @@ const ALLOWED_ACCENTS = ['terracota', 'azul', 'verde', 'violeta'];
 const DEFAULT_THEME = 'claro';
 const DEFAULT_ACCENT = 'terracota';
 
+// Convencion de zonas horarias en toda la app:
+//   - Los TIMESTAMP se persisten en UTC (datetime('now') de SQLite).
+//   - Las consultas que comparan "hoy"/"ayer" usan date(timestamp, 'localtime'),
+//     que respeta el huso horario del SO donde corre Onix.
+//   - El renderer convierte UTC -> local con shared/time.js (EES_TIME).
+// Implicacion: si la BD se copia a una maquina con otro huso horario, los
+// reportes "del dia" pueden cambiar de dia frente al equipo origen. Para
+// mover datos entre husos hay que tenerlo presente.
 function initSchema(database) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS users (

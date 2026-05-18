@@ -127,15 +127,31 @@ async function loadSalidaTipos(preselect = null) {
 }
 loadSalidaTipos();
 
+// ── Modal focus management (a11y) ─────────────────────────────
+const _modalLastFocus = new WeakMap();
+function rememberFocus(modal) {
+  const el = document.activeElement;
+  if (el && el !== document.body) _modalLastFocus.set(modal, el);
+}
+function restoreFocus(modal) {
+  const prev = _modalLastFocus.get(modal);
+  _modalLastFocus.delete(modal);
+  if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+    setTimeout(() => prev.focus(), 0);
+  }
+}
+
 function openTipoModal() {
   regTipoError.classList.add('hidden');
   regTipoError.textContent = '';
   regTipoInput.value = '';
+  rememberFocus(regTipoModal);
   regTipoModal.classList.remove('hidden');
   setTimeout(() => regTipoInput.focus(), 30);
 }
 function closeTipoModal() {
   regTipoModal.classList.add('hidden');
+  restoreFocus(regTipoModal);
   regTipoError.classList.add('hidden');
   regTipoError.textContent = '';
   regTipoInput.value = '';
@@ -242,7 +258,7 @@ async function selectEmpleado(id) {
   regSearchInput.value = '';
   const res = await window.api.getEmpleadoStatus(id);
   if (!res?.ok) {
-    alert(res?.error || 'No se pudo cargar el empleado.');
+    EES_TOAST.error(res?.error || 'No se pudo cargar el empleado.');
     return;
   }
   regSelectedEmpleado = res.empleado;
@@ -250,15 +266,17 @@ async function selectEmpleado(id) {
   renderSelected();
 }
 
+const SEARCH_DEBOUNCE_MS = 150;
+const SEARCH_RESULT_LIMIT = 8;
 regSearchInput.addEventListener('input', () => {
   const q = regSearchInput.value.trim();
   if (regSearchTimer) clearTimeout(regSearchTimer);
   if (!q) { clearSearchResults(); return; }
   regSearchTimer = setTimeout(async () => {
-    const res = await window.api.searchEmpleados(q, 8);
+    const res = await window.api.searchEmpleados(q, SEARCH_RESULT_LIMIT);
     if (!res?.ok) { clearSearchResults(); return; }
     renderSearchResults(res.empleados);
-  }, 150);
+  }, SEARCH_DEBOUNCE_MS);
 });
 
 regResults.addEventListener('click', (e) => {
@@ -277,12 +295,15 @@ document.addEventListener('click', (e) => {
 
 // ── Mark event ────────────────────────────────────────────────
 async function markRegistro(tipo) {
+  // Defensa: bootstrap() es async; si el usuario logra clickar antes de que
+  // termine de hidratarse currentUser, evitamos enviar un evento sin sesion.
+  if (!currentUser) return;
   if (!regSelectedEmpleado) return;
   const t = regSalidaTipo.value;
   const d = regSalidaDetalle.value.trim();
 
   if (tipo === 'salida' && !t) {
-    alert('Selecciona el motivo de la salida.');
+    EES_TOAST.error('Selecciona el motivo de la salida.');
     regSalidaTipo.focus();
     return;
   }
@@ -291,7 +312,7 @@ async function markRegistro(tipo) {
 
   const ts = buildTimestampUtc();
   if (ts && typeof ts === 'object' && ts.error) {
-    alert(ts.error);
+    EES_TOAST.error(ts.error);
     return;
   }
 
@@ -299,7 +320,7 @@ async function markRegistro(tipo) {
   regBtnOut.disabled = true;
   const res = await window.api.markEvent(regSelectedEmpleado.id, tipo, motivo, ts || undefined);
   if (!res?.ok) {
-    alert(res?.error || 'No se pudo registrar el evento');
+    EES_TOAST.error(res?.error || 'No se pudo registrar el evento');
     regBtnIn.disabled = false;
     regBtnOut.disabled = false;
     return;
@@ -336,11 +357,13 @@ function openEmpleadoModal() {
   emDepartamento.value = '';
   emError.classList.add('hidden');
   emError.textContent = '';
+  rememberFocus(empleadoModal);
   empleadoModal.classList.remove('hidden');
   setTimeout(() => emNombre.focus(), 30);
 }
 function closeEmpleadoModal() {
   empleadoModal.classList.add('hidden');
+  restoreFocus(empleadoModal);
 }
 
 document.getElementById('reg-quick-add').addEventListener('click', openEmpleadoModal);

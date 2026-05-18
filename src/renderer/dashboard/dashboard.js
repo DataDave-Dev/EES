@@ -21,6 +21,23 @@ document.getElementById('nav-icon-apariencia').innerHTML = I.palette(15);
 
 let currentUser = null;
 
+// ── Modal focus management ────────────────────────────────────
+// Recuerda el elemento enfocado antes de abrir un modal y lo restaura al
+// cerrar, para que el lector de pantalla y el foco visible vuelvan al boton
+// que abrio el modal (mejor accesibilidad y navegacion por teclado).
+const _modalLastFocus = new WeakMap();
+function rememberFocus(modal) {
+  const el = document.activeElement;
+  if (el && el !== document.body) _modalLastFocus.set(modal, el);
+}
+function restoreFocus(modal) {
+  const prev = _modalLastFocus.get(modal);
+  _modalLastFocus.delete(modal);
+  if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+    setTimeout(() => prev.focus(), 0);
+  }
+}
+
 // ── Hydrate user info ─────────────────────────────────────────
 async function loadUser() {
   const user = await window.api.getCurrentUser();
@@ -545,13 +562,16 @@ function navigateToHistorial(empleadoId) {
     }
     return false;
   };
-  // The empleado select may not be populated yet; retry briefly.
+  // El <select> de empleado puede no estar poblado aun; reintenta brevemente.
+  // Maximo total de espera: SELECT_POLL_MAX_TRIES * SELECT_POLL_INTERVAL_MS = 2s.
+  const SELECT_POLL_MAX_TRIES = 20;
+  const SELECT_POLL_INTERVAL_MS = 100;
   if (!trigger()) {
     let tries = 0;
     const iv = setInterval(() => {
       tries++;
-      if (trigger() || tries > 20) clearInterval(iv);
-    }, 100);
+      if (trigger() || tries > SELECT_POLL_MAX_TRIES) clearInterval(iv);
+    }, SELECT_POLL_INTERVAL_MS);
   }
 }
 
@@ -785,12 +805,14 @@ function openUserModal(user = null) {
 
   renderPwRules();
   renderPw2Match();
+  rememberFocus(userModal);
   userModal.classList.remove('hidden');
   setTimeout(() => umNombre.focus(), 30);
 }
 
 function closeUserModal() {
   userModal.classList.add('hidden');
+  restoreFocus(userModal);
   editingId = null;
   submitToken++;
 }
@@ -892,7 +914,7 @@ usersTbody.addEventListener('click', async (e) => {
     btn.disabled = true;
     const res = await window.api.setUserEstatus(id, next);
     if (!res?.ok) {
-      alert(res?.error || 'No se pudo cambiar el estatus');
+      EES_TOAST.error(res?.error || 'No se pudo cambiar el estatus');
       btn.disabled = false;
       return;
     }
@@ -1009,12 +1031,14 @@ function openEmpleadoModal(emp = null, onCreated = null) {
     emAutoNumeroHint.classList.remove('hidden');
   }
 
+  rememberFocus(empleadoModal);
   empleadoModal.classList.remove('hidden');
   setTimeout(() => (emp ? emNumero : emNombre).focus(), 30);
 }
 
 function closeEmpleadoModal() {
   empleadoModal.classList.add('hidden');
+  restoreFocus(empleadoModal);
   empEditingId = null;
   empCreatedCallback = null;
   empSubmitToken++;
@@ -1092,7 +1116,7 @@ empleadosTbody.addEventListener('click', async (e) => {
     btn.disabled = true;
     const res = await window.api.setEmpleadoEstatus(id, next);
     if (!res?.ok) {
-      alert(res?.error || 'No se pudo cambiar el estatus');
+      EES_TOAST.error(res?.error || 'No se pudo cambiar el estatus');
       btn.disabled = false;
       return;
     }
@@ -1158,12 +1182,14 @@ function openTipoModal(item = null) {
     tipoModalTitle.textContent = 'Nuevo motivo';
     tipoValor.value = '';
   }
+  rememberFocus(tipoModal);
   tipoModal.classList.remove('hidden');
   setTimeout(() => tipoValor.focus(), 30);
 }
 
 function closeTipoModal() {
   tipoModal.classList.add('hidden');
+  restoreFocus(tipoModal);
   tipoEditingId = null;
   tipoSubmitToken++;
 }
@@ -1235,7 +1261,7 @@ tiposTbody.addEventListener('click', async (e) => {
     btn.disabled = true;
     const res = await window.api.deleteCatalogoItem(id);
     if (!res?.ok) {
-      alert(res?.error || 'No se pudo eliminar');
+      EES_TOAST.error(res?.error || 'No se pudo eliminar');
       btn.disabled = false;
       return;
     }
@@ -1384,6 +1410,7 @@ async function openEvtEditModal(ev) {
   evtEditDetalle.value = ev.motivo_detalle || '';
   evtEditMotivoReq.textContent = ev.tipo === 'salida' ? '(obligatorio)' : '(opcional)';
   await populateMotivoSelect(evtEditMotivo, ev.motivo_tipo || '');
+  rememberFocus(evtEditModal);
   evtEditModal.classList.remove('hidden');
   setTimeout(() => evtEditTs.focus(), 30);
 }
@@ -1394,6 +1421,7 @@ evtEditTipo.addEventListener('change', () => {
 
 function closeEvtEditModal() {
   evtEditModal.classList.add('hidden');
+  restoreFocus(evtEditModal);
   editingEventId = null;
   evtEditPw.value = '';
 }
@@ -1457,12 +1485,14 @@ function openEvtDelModal(ev) {
     <div><b>${escapeHtml(ev.emp_nombre)} ${escapeHtml(ev.emp_apellidos)}</b> · #${escapeHtml(ev.numero_empleado)}</div>
     <div class="users-muted">${fmtTime(ev.timestamp)} · ${escapeHtml(ev.tipo)}${escapeHtml(motivoBit)}</div>
   `;
+  rememberFocus(evtDelModal);
   evtDelModal.classList.remove('hidden');
   setTimeout(() => evtDelPw.focus(), 30);
 }
 
 function closeEvtDelModal() {
   evtDelModal.classList.add('hidden');
+  restoreFocus(evtDelModal);
   deletingEventId = null;
   evtDelPw.value = '';
 }
@@ -1744,7 +1774,7 @@ permsSaveBtn.addEventListener('click', async () => {
   permsSaveBtn.innerHTML = prevLabel;
 
   if (errors.length) {
-    alert(`Algunos cambios no se guardaron:\n\n${errors.join('\n')}`);
+    EES_TOAST.error(`Algunos cambios no se guardaron: ${errors.join(' · ')}`, 7000);
   }
 
   // If we edited ourselves, refresh currentUser so sidebar reflects new perms
@@ -1800,7 +1830,7 @@ async function handleExport(action, payload) {
   const fn = action === 'xlsx' ? window.api.exportReporteExcel : window.api.exportReportePdf;
   const res = await fn(payload);
   if (!res?.ok) {
-    if (!res?.canceled) alert(res?.error || 'No se pudo exportar');
+    if (!res?.canceled) EES_TOAST.error(res?.error || 'No se pudo exportar');
   }
 }
 
@@ -1938,7 +1968,7 @@ async function loadRepHiEmpleados() {
 
 async function repHiGenerar() {
   const id = Number(repHiEmpleado.value);
-  if (!id) { alert('Selecciona un empleado.'); return; }
+  if (!id) { EES_TOAST.error('Selecciona un empleado.'); return; }
   repHiTbody.innerHTML = '<tr class="users-empty-row"><td colspan="4">Cargando…</td></tr>';
   repHiSummary.classList.add('hidden');
   const res = await window.api.reporteHistorial(id, repHiIni.value, repHiFin.value);
@@ -2540,10 +2570,12 @@ function renderReleaseNotes(raw) {
 }
 
 function openUpdateModal() {
+  rememberFocus(updModal);
   updModal.classList.remove('hidden');
 }
 function closeUpdateModal() {
   updModal.classList.add('hidden');
+  restoreFocus(updModal);
 }
 updModal.querySelectorAll('[data-updmodal-close]').forEach((el) => {
   el.addEventListener('click', closeUpdateModal);
@@ -2886,7 +2918,10 @@ const hdModalSummary = document.getElementById('rep-hd-modal-summary');
 const hdModalTbody = document.getElementById('rep-hd-modal-tbody');
 document.getElementById('icon-hdmodal-close').innerHTML = I.close(14);
 
-function closeHdModal() { hdModal.classList.add('hidden'); }
+function closeHdModal() {
+  hdModal.classList.add('hidden');
+  restoreFocus(hdModal);
+}
 hdModal.addEventListener('click', (e) => {
   if (e.target === hdModal || e.target.closest('[data-hdmodal-close]')) closeHdModal();
 });
@@ -2898,6 +2933,7 @@ async function openHdDetail(empleadoId) {
   if (!empleadoId || !repHdData) return;
   hdModalSummary.innerHTML = '<div class="users-muted" style="padding: 8px;">Cargando…</div>';
   hdModalTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Cargando…</td></tr>';
+  rememberFocus(hdModal);
   hdModal.classList.remove('hidden');
 
   const r = repHdData.rango;
@@ -3156,7 +3192,10 @@ const auditDetailMeta = document.getElementById('audit-detail-meta');
 const auditDetailJson = document.getElementById('audit-detail-json');
 document.getElementById('icon-audmodal-close').innerHTML = I.close(14);
 
-function closeAuditDetail() { auditDetailModal.classList.add('hidden'); }
+function closeAuditDetail() {
+  auditDetailModal.classList.add('hidden');
+  restoreFocus(auditDetailModal);
+}
 auditDetailModal.addEventListener('click', (e) => {
   if (e.target === auditDetailModal || e.target.closest('[data-audmodal-close]')) closeAuditDetail();
 });
@@ -3178,6 +3217,7 @@ auditTbody.addEventListener('click', (e) => {
     <div class="audit-detail-meta-row"><span class="audit-detail-meta-label">Entidad</span><span>${escapeHtml(row.entity_label || row.entity_type || '—')}</span></div>
   `;
   auditDetailJson.textContent = row.details ? JSON.stringify(row.details, null, 2) : '(sin datos adicionales)';
+  rememberFocus(auditDetailModal);
   auditDetailModal.classList.remove('hidden');
 });
 

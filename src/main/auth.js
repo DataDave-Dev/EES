@@ -2,6 +2,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { app } = require('electron');
 const bcrypt = require('bcrypt');
+const logger = require('./logger');
 const {
   getDb,
   ALL_MODULES,
@@ -79,7 +80,7 @@ function saveLastUser(username) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, String(username || '').trim(), 'utf-8');
   } catch (err) {
-    console.error('[auth] failed to save last user:', err);
+    logger.error('auth', 'failed to save last user:', err);
   }
 }
 

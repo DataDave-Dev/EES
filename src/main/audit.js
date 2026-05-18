@@ -1,4 +1,5 @@
 const { getDb } = require('./db');
+const logger = require('./logger');
 
 // Action codes used across the system. Listed here for documentation/UI.
 // Format: <domain>.<verb>
@@ -53,8 +54,29 @@ function stmts() {
       WHERE user_id IS NOT NULL
       ORDER BY username
     `),
+    purgeOlderThan: db.prepare(`
+      DELETE FROM audit_log
+      WHERE timestamp < datetime('now', ?)
+    `),
   };
   return S;
+}
+
+// Retención: borra entradas de la bitácora con más de N meses.
+// Se invoca al arrancar la app para evitar que la tabla crezca sin límite.
+const RETENTION_MONTHS = 12;
+function purgeOldEntries(months = RETENTION_MONTHS) {
+  try {
+    const offset = `-${Math.max(1, months)} months`;
+    const info = stmts().purgeOlderThan.run(offset);
+    if (info.changes > 0) {
+      logger.info('audit', `purga retención: ${info.changes} entrada(s) eliminadas (>${months} meses)`);
+    }
+    return info.changes;
+  } catch (err) {
+    logger.error('audit', 'purgeOldEntries failed:', err);
+    return 0;
+  }
 }
 
 // listLog uses dynamic WHERE clauses; cache compiled statements per unique
@@ -95,7 +117,7 @@ function log(entry) {
       details
     );
   } catch (err) {
-    console.error('[audit] log failed:', err);
+    logger.error('audit', 'log failed:', err);
   }
 }
 
@@ -139,7 +161,7 @@ function listLog(opts = {}) {
       })),
     };
   } catch (err) {
-    console.error('[audit] listLog failed:', err);
+    logger.error('audit', 'listLog failed:', err);
     return { ok: false, error: 'Error al consultar la bitácora' };
   }
 }
@@ -160,8 +182,10 @@ function listKnownUsers() {
 
 module.exports = {
   ACTIONS,
+  RETENTION_MONTHS,
   log,
   listLog,
   listKnownActions,
   listKnownUsers,
+  purgeOldEntries,
 };

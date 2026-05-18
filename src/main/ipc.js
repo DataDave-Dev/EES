@@ -8,6 +8,7 @@ const exportsLib = require('./exports');
 const dashboardLib = require('./dashboard');
 const configuracionLib = require('./configuracion');
 const auditLib = require('./audit');
+const logger = require('./logger');
 const updater = require('./updater');
 
 // Convenience: append an audit entry tagged with the current user as actor.
@@ -32,7 +33,7 @@ function safe(fn) {
     try {
       return await fn(event, ...args);
     } catch (err) {
-      console.error('[ipc] error:', err);
+      logger.error('ipc', err);
       return { ok: false, error: 'Error interno' };
     }
   };

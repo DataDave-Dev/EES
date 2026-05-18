@@ -4,6 +4,7 @@ const path = require('node:path');
 const { getDb, closeDb } = require('./main/db');
 const { registerIpc, VIEW_SIZES } = require('./main/ipc');
 const { hasUsers } = require('./main/auth');
+const { purgeOldEntries: purgeAudit } = require('./main/audit');
 
 if (require('electron-squirrel-startup')) {
   app.quit();
@@ -48,6 +49,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // sandbox: false es necesario porque el preload usa modulos nativos
+      // (better-sqlite3, bcrypt via ipc) que no funcionan en un renderer sandboxed.
+      // La defensa en profundidad la dan contextIsolation + Fuses (asar integrity,
+      // OnlyLoadAppFromAsar, RunAsNode:false) y la validacion estricta en cada IPC.
       sandbox: false,
     },
   });
@@ -61,6 +66,8 @@ function createWindow() {
 
 app.whenReady().then(() => {
   getDb();
+  // Mantener la bitácora dentro de un horizonte razonable (ver audit.RETENTION_MONTHS).
+  try { purgeAudit(); } catch (_) { /* no-op */ }
   registerIpc();
   createWindow();
 

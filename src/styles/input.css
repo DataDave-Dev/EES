@@ -449,6 +449,53 @@ input:-webkit-autofill {
     color: var(--success);
     font-size: 12.5px;
   }
+  /* Toast (non-blocking feedback) */
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: min(360px, calc(100% - 40px));
+    pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    cursor: pointer;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow:
+      0 0 0 1px var(--window-ring),
+      0 10px 28px var(--window-shadow-1);
+    animation: fadeUp 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+  .toast.is-leaving { opacity: 0; transform: translateY(6px); }
+  .toast--error {
+    background: rgba(229, 72, 77, 0.10);
+    border-color: rgba(229, 72, 77, 0.30);
+    color: var(--error);
+  }
+  .toast--success {
+    background: rgba(46, 166, 108, 0.10);
+    border-color: rgba(46, 166, 108, 0.30);
+    color: var(--success);
+  }
+  .toast--info {
+    background: rgba(85, 130, 200, 0.10);
+    border-color: rgba(85, 130, 200, 0.30);
+    color: var(--text);
+  }
+
   .alert-info {
     @apply flex items-center gap-2 rounded-lg px-3 py-2;
     background: rgba(85, 130, 200, 0.10);
@@ -905,7 +952,8 @@ input:-webkit-autofill {
   }
 
   .sidebar-nav {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -1477,11 +1525,25 @@ input:-webkit-autofill {
     justify-content: center;
   }
   .regn-card {
-    width: min(560px, 100%);
-    padding: 24px 28px 24px;
+    width: 100%;
+    max-width: 1100px;
+    padding: 28px 32px 28px;
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 24px;
+  }
+  .regn-form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .regn-col { display: flex; flex-direction: column; gap: 22px; }
+  @media (min-width: 900px) {
+    .regn-form-grid {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      column-gap: 32px;
+      align-items: start;
+    }
   }
 
   /* Sectioned form layout */
@@ -1549,6 +1611,10 @@ input:-webkit-autofill {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     margin-top: 4px;
+    width: 100%;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
   }
   /* Themed <select> — neutralize native styling, follow theme */
   .field-select {
