@@ -23,8 +23,8 @@ function auditAction(action, info = {}) {
 
 const VIEW_SIZES = {
   login: { width: 460, height: 640, resizable: false },
-  setup: { width: 560, height: 680, resizable: true },
-  dashboard: { width: 1280, height: 800, resizable: true, maximize: true },
+  setup: { width: 560, height: 680, resizable: true, minWidth: 480, minHeight: 600 },
+  dashboard: { width: 1280, height: 800, resizable: true, maximize: true, minWidth: 800, minHeight: 600 },
 };
 
 function safe(fn) {
@@ -82,6 +82,9 @@ function setView(event, view) {
 
   win.setResizable(true);
   win.setMaximizable(size.resizable);
+  // Ajustar el mínimo antes del setContentSize para que la nueva vista
+  // no quede bloqueada por el mínimo de la vista previa.
+  win.setMinimumSize(size.minWidth ?? size.width, size.minHeight ?? size.height);
   win.setContentSize(size.width, size.height);
 
   if (size.maximize) {

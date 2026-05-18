@@ -35,6 +35,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: size.width,
     height: size.height,
+    minWidth: size.minWidth ?? size.width,
+    minHeight: size.minHeight ?? size.height,
     useContentSize: true,
     resizable: size.resizable,
     minimizable: true,
