@@ -23,7 +23,8 @@ window.EES_FOCUS_TRAP = (() => {
   function getFocusable(root) {
     return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR))
       .filter((el) => {
-        if (el.hasAttribute('aria-hidden') && el.getAttribute('aria-hidden') === 'true') return false;
+        // descartar si el propio elemento o cualquier ancestro tiene aria-hidden=true
+        if (el.closest('[aria-hidden="true"]')) return false;
         // descartar elementos invisibles (display:none, visibility:hidden)
         const style = window.getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden') return false;

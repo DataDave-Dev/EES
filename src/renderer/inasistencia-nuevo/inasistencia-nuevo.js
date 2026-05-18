@@ -381,7 +381,13 @@ function showError(msg) {
 cancelBtn.addEventListener('click', goBack);
 document.getElementById('ina-back').addEventListener('click', goBack);
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') goBack();
+  if (e.key !== 'Escape') return;
+  // Si hay un modal abierto o el combobox de busqueda esta abierto, no salir
+  // de la vista — esos handlers locales gestionan el Esc.
+  const hasOpenModal = !!document.querySelector('.modal-backdrop:not(.hidden)');
+  if (hasOpenModal) return;
+  if (!resultsBox.classList.contains('hidden')) return;
+  goBack();
 });
 
 // ── Submit ────────────────────────────────────────────────────

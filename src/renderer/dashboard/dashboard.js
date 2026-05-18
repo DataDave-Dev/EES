@@ -66,15 +66,8 @@ function installModalFocusTraps() {
   });
 }
 
-// Esc global cierra el primer modal visible.
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  const openModal = Array.from(document.querySelectorAll('.modal-backdrop'))
-    .find((m) => !m.classList.contains('hidden'));
-  if (!openModal) return;
-  const closeBtn = openModal.querySelector('[data-evtmodal-close], [data-delmodal-close], [data-inadelmodal-close], [data-minamodal-close], [data-tipomodal-close], [data-empmodal-close], [data-userclose], [data-updmodal-close], [data-audmodal-close], [data-hdmodal-close], .modal-close-btn');
-  if (closeBtn) { e.preventDefault(); closeBtn.click(); }
-});
+// Nota: cada modal del dashboard registra su propio handler de Escape
+// (mas abajo, junto a las funciones close*Modal). No se duplica aqui.
 
 // ── Hydrate user info ─────────────────────────────────────────
 async function loadUser() {
