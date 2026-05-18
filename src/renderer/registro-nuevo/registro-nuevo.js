@@ -254,14 +254,20 @@ function clearSearchResults() {
 }
 
 function renderSelected() {
+  const hint = document.getElementById('reg-actions-hint');
   if (!regSelectedEmpleado) {
     regSelected.classList.add('hidden');
     regSelected.innerHTML = '';
     regSalidaFields.classList.add('reg-step--disabled');
     regBtnIn.disabled = true;
     regBtnOut.disabled = true;
+    if (hint) {
+      hint.textContent = 'Selecciona un empleado para registrar entrada o salida.';
+      hint.classList.remove('hidden');
+    }
     return;
   }
+  if (hint) hint.classList.add('hidden');
   regSalidaFields.classList.remove('reg-step--disabled');
   const e = regSelectedEmpleado;
   const metaParts = [`#${e.numero_empleado}`];

@@ -753,6 +753,23 @@ async function loadUsers() {
 
 document.getElementById('users-refresh').addEventListener('click', loadUsers);
 
+// Buscador local sobre usersCache (username, nombre, apellidos).
+const usersSearch = document.getElementById('users-search');
+document.getElementById('users-search-icon').innerHTML = I.search(14);
+usersSearch.addEventListener('input', () => {
+  const q = usersSearch.value.trim().toLowerCase();
+  if (!q) { renderUsersRows(usersCache); return; }
+  const filtered = usersCache.filter((u) => {
+    const hay = `${u.username} ${u.nombre} ${u.apellidos}`.toLowerCase();
+    return hay.includes(q);
+  });
+  if (!filtered.length) {
+    usersTbody.innerHTML = `<tr class="users-empty-row"><td colspan="5">Sin coincidencias para "${escapeHtml(usersSearch.value)}".</td></tr>`;
+    return;
+  }
+  renderUsersRows(filtered);
+});
+
 // ── User modal: create + edit ──────────────────────────────────
 const userModal = document.getElementById('user-modal');
 const userForm = document.getElementById('user-form');
@@ -1021,6 +1038,23 @@ async function loadEmpleados() {
 }
 
 document.getElementById('empleados-refresh').addEventListener('click', loadEmpleados);
+
+// Buscador local sobre empleadosCache (numero, nombre, apellidos, puesto, departamento).
+const empleadosSearch = document.getElementById('empleados-search');
+document.getElementById('empleados-search-icon').innerHTML = I.search(14);
+empleadosSearch.addEventListener('input', () => {
+  const q = empleadosSearch.value.trim().toLowerCase();
+  if (!q) { renderEmpleadosRows(empleadosCache); return; }
+  const filtered = empleadosCache.filter((e) => {
+    const hay = `${e.numero_empleado} ${e.nombre} ${e.apellidos} ${e.puesto || ''} ${e.departamento || ''}`.toLowerCase();
+    return hay.includes(q);
+  });
+  if (!filtered.length) {
+    empleadosTbody.innerHTML = `<tr class="users-empty-row"><td colspan="6">Sin coincidencias para "${escapeHtml(empleadosSearch.value)}".</td></tr>`;
+    return;
+  }
+  renderEmpleadosRows(filtered);
+});
 
 // ── Empleado modal: create + edit ──────────────────────────────
 const empleadoModal = document.getElementById('empleado-modal');

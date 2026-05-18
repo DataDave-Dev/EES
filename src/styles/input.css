@@ -1413,6 +1413,68 @@ input:-webkit-autofill {
   }
   .users-refresh-link:hover { text-decoration: underline; }
 
+  /* Toolbar search (compact) — usado en Empleados y Usuarios. */
+  .toolbar-search {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: min(280px, 100%);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .toolbar-search:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+  .toolbar-search-icon { color: var(--muted); display: inline-flex; }
+  .toolbar-search-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    outline: none;
+    color: var(--text);
+    font-size: 13.5px;
+    font-family: inherit;
+  }
+
+  /* Empty state ilustrado para tablas/listados sin datos. */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 40px 24px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .empty-state-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+  .empty-state-title {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .empty-state-sub {
+    font-size: 12.5px;
+    color: var(--muted);
+    max-width: 320px;
+  }
+
   .users-card {
     padding: 0;
     overflow: hidden;
@@ -2447,6 +2509,12 @@ input:-webkit-autofill {
     border: 1px solid var(--border-soft);
     border-radius: 12px;
     flex-wrap: wrap;
+    /* Sticky para que los filtros sigan visibles al hacer scroll en tablas largas.
+       Se posiciona justo debajo del topbar (68px de altura). */
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    backdrop-filter: blur(6px);
   }
   .rep-filter-item {
     display: flex;

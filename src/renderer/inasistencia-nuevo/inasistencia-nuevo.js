@@ -125,7 +125,7 @@ async function loadExistingRecord(id) {
     showEvidenciaState(`Adjunto actual: ${row.evidencia.filename || 'archivo'}`, true);
     evidenciaLabel.textContent = 'Reemplazar archivo';
   }
-  stepPw.style.display = '';
+  stepPw.classList.remove('hidden');
 }
 
 // ── Buscador de empleados ─────────────────────────────────────

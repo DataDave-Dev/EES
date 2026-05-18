@@ -285,10 +285,16 @@
                 <button type="button" id="empleados-refresh" class="users-refresh-link">Actualizar</button>
               </p>
             </div>
-            <button type="button" id="empleados-new-btn" class="btn-primary users-new-btn">
-              <span id="icon-empleados-new"></span>
-              <span>Nuevo empleado</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <label class="toolbar-search" for="empleados-search">
+                <span class="toolbar-search-icon" id="empleados-search-icon"></span>
+                <input type="search" id="empleados-search" class="toolbar-search-input" placeholder="Buscar por número, nombre o puesto…" autocomplete="off" spellcheck="false" aria-label="Buscar empleado" />
+              </label>
+              <button type="button" id="empleados-new-btn" class="btn-primary users-new-btn">
+                <span id="icon-empleados-new"></span>
+                <span>Nuevo empleado</span>
+              </button>
+            </div>
           </div>
 
           <div class="window users-card">
@@ -460,10 +466,16 @@
                 <button type="button" id="users-refresh" class="users-refresh-link">Actualizar</button>
               </p>
             </div>
-            <button type="button" id="users-new-btn" class="btn-primary users-new-btn">
-              <span id="icon-users-new"></span>
-              <span>Nuevo usuario</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <label class="toolbar-search" for="users-search">
+                <span class="toolbar-search-icon" id="users-search-icon"></span>
+                <input type="search" id="users-search" class="toolbar-search-input" placeholder="Buscar por usuario o nombre…" autocomplete="off" spellcheck="false" aria-label="Buscar usuario" />
+              </label>
+              <button type="button" id="users-new-btn" class="btn-primary users-new-btn">
+                <span id="icon-users-new"></span>
+                <span>Nuevo usuario</span>
+              </button>
+            </div>
           </div>
 
           <div class="window users-card">

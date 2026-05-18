@@ -124,12 +124,13 @@
         </div>
 
         <!-- Acciones -->
+        <span id="reg-actions-hint" class="field-hint" aria-live="polite">Selecciona un empleado para registrar entrada o salida.</span>
         <div class="reg-actions-grid">
-          <button type="button" id="reg-btn-in" class="reg-action-btn reg-action-btn--in" disabled>
+          <button type="button" id="reg-btn-in" class="reg-action-btn reg-action-btn--in" disabled aria-describedby="reg-actions-hint">
             <span id="reg-icon-in"></span>
             <span>Entrada</span>
           </button>
-          <button type="button" id="reg-btn-out" class="reg-action-btn reg-action-btn--out" disabled>
+          <button type="button" id="reg-btn-out" class="reg-action-btn reg-action-btn--out" disabled aria-describedby="reg-actions-hint">
             <span id="reg-icon-out"></span>
             <span>Salida</span>
           </button>
