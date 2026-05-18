@@ -1,5 +1,6 @@
 const { getDb } = require('./db');
 const configLib = require('./configuracion');
+const inasistenciasLib = require('./inasistencias');
 
 // ── Helpers ───────────────────────────────────────────────────
 function timeToSec(hhmm) {
@@ -239,18 +240,30 @@ function horasDentroFuera(fechaIni, fechaFin) {
   // Include all active empleados even with zero activity
   const activos = s.empleadosActivos.all();
 
+  // Inasistencias registradas en el rango (justificadas o no). Mapean
+  // empleado_id -> Map<date, { motivo_tipo, motivo_detalle, justificada }>.
+  const inasistenciasMap = inasistenciasLib.getInasistenciasParaRango(ini, fin);
+
   const result = activos.map((emp) => {
     const days = byEmp.get(emp.id) || new Map();
+    const inasDay = inasistenciasMap.get(emp.id) || new Map();
     let totalInside = 0;
     let totalOutside = 0;
     let diasConActividad = 0;
+    let diasAusenteJustificado = 0;
+    let diasAusenteInjustificado = 0;
     for (const date of workdays) {
       const events = days.get(date);
-      if (!events || events.length === 0) continue;
-      const s = computeDayStats(events, ws, we, date === todayIso, nowSec);
-      totalInside += s.inside_sec;
-      totalOutside += s.outside_sec;
-      diasConActividad += 1;
+      if (events && events.length > 0) {
+        const s = computeDayStats(events, ws, we, date === todayIso, nowSec);
+        totalInside += s.inside_sec;
+        totalOutside += s.outside_sec;
+        diasConActividad += 1;
+      } else {
+        const ina = inasDay.get(date);
+        if (ina && ina.justificada) diasAusenteJustificado += 1;
+        else diasAusenteInjustificado += 1;
+      }
     }
     const totalHorario = diasConActividad * workWin;
     const pct = totalHorario > 0 ? (totalInside / totalHorario) * 100 : 0;
@@ -262,6 +275,8 @@ function horasDentroFuera(fechaIni, fechaFin) {
       dias_laborables: workdays.length,
       dias_con_actividad: diasConActividad,
       dias_ausente: workdays.length - diasConActividad,
+      dias_ausente_justificado: diasAusenteJustificado,
+      dias_ausente_injustificado: diasAusenteInjustificado,
       inside_sec: totalInside,
       outside_sec: totalOutside,
       total_horario_sec: totalHorario,
@@ -315,12 +330,29 @@ function horasDentroFueraEmpleado(empleadoId, fechaIni, fechaFin) {
     arr.push(r);
   }
 
+  const inasistenciasMap = inasistenciasLib
+    .getInasistenciasParaRango(ini, fin, empleadoId)
+    .get(Number(empleadoId)) || new Map();
+
   let totalInside = 0;
   let totalOutside = 0;
+  let diasAusenteJustificado = 0;
+  let diasAusenteInjustificado = 0;
   const days = workdays.map((date) => {
     const evs = byDate.get(date) || [];
+    const ina = inasistenciasMap.get(date) || null;
     if (!evs.length) {
-      return { date, ausente: true, events: [], inside_sec: 0, outside_sec: 0, pct: 0 };
+      if (ina && ina.justificada) diasAusenteJustificado += 1;
+      else diasAusenteInjustificado += 1;
+      return {
+        date,
+        ausente: true,
+        events: [],
+        inside_sec: 0,
+        outside_sec: 0,
+        pct: 0,
+        inasistencia: ina,
+      };
     }
     const s = computeDayStats(
       evs.map((e) => ({ time_sec: e.local_sec, tipo: e.tipo })),
@@ -335,6 +367,9 @@ function horasDentroFueraEmpleado(empleadoId, fechaIni, fechaFin) {
       inside_sec: s.inside_sec,
       outside_sec: s.outside_sec,
       pct: workWin > 0 ? (s.inside_sec / workWin) * 100 : 0,
+      // Si el empleado vino el día pero también hay inasistencia registrada,
+      // exponemos el conflicto para que la UI lo señale.
+      inasistencia: ina,
     };
   });
 
@@ -363,6 +398,92 @@ function horasDentroFueraEmpleado(empleadoId, fechaIni, fechaFin) {
     dias_laborables: workdays.length,
     dias_con_actividad: diasConActividad,
     dias_ausente: workdays.length - diasConActividad,
+    dias_ausente_justificado: diasAusenteJustificado,
+    dias_ausente_injustificado: diasAusenteInjustificado,
+  };
+}
+
+// ── Inasistencias por periodo ─────────────────────────────────
+// Devuelve la lista cruda de inasistencias que se solapen con [ini, fin],
+// más totales agregados por motivo y por empleado.
+function inasistenciasPorPeriodo(fechaIni, fechaFin, empleadoId = null) {
+  const ini = (fechaIni || '').trim();
+  const fin = (fechaFin || '').trim();
+  if (!ini || !fin) return { ok: false, error: 'Selecciona rango de fechas' };
+  if (ini > fin) return { ok: false, error: 'La fecha inicial debe ser anterior o igual a la final' };
+
+  const empId = empleadoId != null && empleadoId !== '' ? Number(empleadoId) : null;
+  const rows = inasistenciasLib.listInasistencias({
+    ini, fin,
+    empleadoId: empId,
+  });
+
+  // Días efectivos: cuántos días del rango registrado caen dentro de [ini, fin].
+  function diasEfectivos(r) {
+    const lo = r.fecha_ini < ini ? ini : r.fecha_ini;
+    const hi = r.fecha_fin > fin ? fin : r.fecha_fin;
+    if (lo > hi) return 0;
+    const a = new Date(lo + 'T00:00:00');
+    const b = new Date(hi + 'T00:00:00');
+    return Math.max(0, Math.round((b - a) / 86400000) + 1);
+  }
+
+  const rowsEnriched = rows.map((r) => ({ ...r, dias_efectivos: diasEfectivos(r) }));
+
+  // Resumen por motivo: cuenta de registros y total de días efectivos.
+  const motivosMap = new Map();
+  for (const r of rowsEnriched) {
+    let m = motivosMap.get(r.motivo_tipo);
+    if (!m) {
+      m = { motivo: r.motivo_tipo, justificada: r.justificada, total: 0, dias: 0 };
+      motivosMap.set(r.motivo_tipo, m);
+    }
+    m.total += 1;
+    m.dias += r.dias_efectivos;
+  }
+  const porMotivo = Array.from(motivosMap.values())
+    .sort((a, b) => b.dias - a.dias || a.motivo.localeCompare(b.motivo));
+
+  // Resumen por empleado.
+  const empMap = new Map();
+  for (const r of rowsEnriched) {
+    if (!r.empleado) continue;
+    let m = empMap.get(r.empleado_id);
+    if (!m) {
+      m = {
+        empleado_id: r.empleado_id,
+        numero_empleado: r.empleado.numero_empleado,
+        nombre: r.empleado.nombre,
+        apellidos: r.empleado.apellidos,
+        registros: 0,
+        dias: 0,
+        dias_justificados: 0,
+        dias_injustificados: 0,
+      };
+      empMap.set(r.empleado_id, m);
+    }
+    m.registros += 1;
+    m.dias += r.dias_efectivos;
+    if (r.justificada) m.dias_justificados += r.dias_efectivos;
+    else m.dias_injustificados += r.dias_efectivos;
+  }
+  const porEmpleado = Array.from(empMap.values())
+    .sort((a, b) => b.dias - a.dias || a.apellidos.localeCompare(b.apellidos));
+
+  const totales = {
+    registros: rowsEnriched.length,
+    dias: rowsEnriched.reduce((s, r) => s + r.dias_efectivos, 0),
+    dias_justificados: rowsEnriched.filter((r) => r.justificada).reduce((s, r) => s + r.dias_efectivos, 0),
+    dias_injustificados: rowsEnriched.filter((r) => !r.justificada).reduce((s, r) => s + r.dias_efectivos, 0),
+  };
+
+  return {
+    ok: true,
+    rango: { ini, fin },
+    rows: rowsEnriched,
+    por_motivo: porMotivo,
+    por_empleado: porEmpleado,
+    totales,
   };
 }
 
@@ -372,4 +493,5 @@ module.exports = {
   salidasPorMotivo,
   horasDentroFuera,
   horasDentroFueraEmpleado,
+  inasistenciasPorPeriodo,
 };

@@ -2,7 +2,7 @@ const { getDb } = require('./db');
 
 // Catálogos conocidos. Validamos contra esta lista para impedir que el cliente
 // invente nombres arbitrarios de catálogo.
-const KNOWN_CATALOGOS = new Set(['motivos']);
+const KNOWN_CATALOGOS = new Set(['motivos', 'inasistencia_motivos']);
 
 let S = null;
 function stmts() {

@@ -1,7 +1,8 @@
-const { ipcMain, BrowserWindow } = require('electron');
+const { ipcMain, BrowserWindow, shell } = require('electron');
 const auth = require('./auth');
 const empleados = require('./empleados');
 const registro = require('./registro');
+const inasistencias = require('./inasistencias');
 const catalogos = require('./catalogos');
 const reportes = require('./reportes');
 const exportsLib = require('./exports');
@@ -437,12 +438,147 @@ function registerIpc() {
     })
   );
 
+  // ── Inasistencias ─────────────────────────────────────────────
+  ipcMain.handle(
+    'inasistencias:list',
+    requirePerm('inasistencias', async (_e, filtros = {}) => ({
+      ok: true,
+      inasistencias: inasistencias.listInasistencias(filtros || {}),
+    }))
+  );
+
+  ipcMain.handle(
+    'inasistencias:create',
+    requirePerm('inasistencias', async (_e, payload = {}) => {
+      const u = auth.getCurrentUser();
+      const r = inasistencias.createInasistencia(payload || {}, u.id);
+      if (r?.ok && r.inasistencia) {
+        const ina = r.inasistencia;
+        auditAction('inasistencia.create', {
+          entity_type: 'inasistencia',
+          entity_id: ina.id,
+          entity_label: ina.empleado
+            ? `#${ina.empleado.numero_empleado} ${ina.empleado.nombre} ${ina.empleado.apellidos}`
+            : `inasistencia #${ina.id}`,
+          details: {
+            empleado_id: ina.empleado_id,
+            fecha_ini: ina.fecha_ini,
+            fecha_fin: ina.fecha_fin,
+            dias: ina.dias,
+            motivo_tipo: ina.motivo_tipo,
+            motivo_detalle: ina.motivo_detalle,
+            justificada: ina.justificada,
+            evidencia: !!ina.evidencia,
+          },
+        });
+      }
+      return r;
+    })
+  );
+
+  ipcMain.handle(
+    'inasistencias:update',
+    requirePermAndPassword('inasistencias', async (_e, { id, payload } = {}) => {
+      const before = inasistencias.findByIdJoined(id);
+      const r = inasistencias.updateInasistencia(id, payload || {});
+      if (r?.ok && r.inasistencia) {
+        const after = r.inasistencia;
+        const beforePub = inasistencias.publicInasistencia(before);
+        auditAction('inasistencia.update', {
+          entity_type: 'inasistencia',
+          entity_id: after.id,
+          entity_label: after.empleado
+            ? `#${after.empleado.numero_empleado} ${after.empleado.nombre} ${after.empleado.apellidos}`
+            : `inasistencia #${after.id}`,
+          details: {
+            before: beforePub ? {
+              empleado_id: beforePub.empleado_id,
+              fecha_ini: beforePub.fecha_ini,
+              fecha_fin: beforePub.fecha_fin,
+              motivo_tipo: beforePub.motivo_tipo,
+              motivo_detalle: beforePub.motivo_detalle,
+              evidencia: !!beforePub.evidencia,
+            } : null,
+            after: {
+              empleado_id: after.empleado_id,
+              fecha_ini: after.fecha_ini,
+              fecha_fin: after.fecha_fin,
+              motivo_tipo: after.motivo_tipo,
+              motivo_detalle: after.motivo_detalle,
+              evidencia: !!after.evidencia,
+            },
+          },
+        });
+      }
+      return r;
+    })
+  );
+
+  ipcMain.handle(
+    'inasistencias:delete',
+    requirePermAndPassword('inasistencias', async (_e, { id } = {}) => {
+      const before = inasistencias.findByIdJoined(id);
+      const r = inasistencias.deleteInasistencia(id);
+      if (r?.ok && before) {
+        const beforePub = inasistencias.publicInasistencia(before);
+        auditAction('inasistencia.delete', {
+          entity_type: 'inasistencia',
+          entity_id: beforePub.id,
+          entity_label: beforePub.empleado
+            ? `#${beforePub.empleado.numero_empleado} ${beforePub.empleado.nombre} ${beforePub.empleado.apellidos}`
+            : `inasistencia #${beforePub.id}`,
+          details: {
+            empleado_id: beforePub.empleado_id,
+            fecha_ini: beforePub.fecha_ini,
+            fecha_fin: beforePub.fecha_fin,
+            motivo_tipo: beforePub.motivo_tipo,
+            motivo_detalle: beforePub.motivo_detalle,
+            evidencia: !!beforePub.evidencia,
+          },
+        });
+      }
+      return r;
+    })
+  );
+
+  ipcMain.handle(
+    'inasistencias:openEvidencia',
+    requirePerm('inasistencias', async (_e, { id } = {}) => {
+      const abs = inasistencias.getEvidenciaAbsolutePath(id);
+      if (!abs) return { ok: false, error: 'No hay evidencia para esta inasistencia' };
+      const msg = await shell.openPath(abs);
+      if (msg) return { ok: false, error: msg };
+      return { ok: true };
+    })
+  );
+
+  ipcMain.handle(
+    'inasistencias:listEmpleados',
+    requirePerm('inasistencias', async () => ({
+      ok: true,
+      empleados: empleados.listEmpleados().filter((e) => e.estatus === 'activo'),
+    }))
+  );
+
+  // catalogos:list es lookup de dropdowns (motivos en registro,
+  // inasistencia_motivos en inasistencias). Cualquier usuario con permiso de
+  // alguno de los módulos consumidores puede leerlos.
   ipcMain.handle(
     'catalogos:list',
-    requirePerm('registro', async (_e, { catalogo, activeOnly } = {}) => ({
-      ok: true,
-      items: catalogos.listItems(catalogo, { activeOnly: activeOnly !== false }),
-    }))
+    safe(async (_e, { catalogo, activeOnly } = {}) => {
+      const u = auth.getCurrentUser();
+      if (!u) return { ok: false, error: 'No autenticado' };
+      const allowed =
+        auth.hasPermission(u.id, 'registro') ||
+        auth.hasPermission(u.id, 'inasistencias') ||
+        auth.hasPermission(u.id, 'catalogos') ||
+        auth.hasPermission(u.id, 'reportes');
+      if (!allowed) return { ok: false, error: 'Sin permisos' };
+      return {
+        ok: true,
+        items: catalogos.listItems(catalogo, { activeOnly: activeOnly !== false }),
+      };
+    })
   );
 
   ipcMain.handle(
@@ -556,6 +692,13 @@ function registerIpc() {
     'reportes:horasDentroFueraEmpleado',
     requirePerm('reportes', async (_e, { empleadoId, ini, fin } = {}) =>
       reportes.horasDentroFueraEmpleado(empleadoId, ini, fin)
+    )
+  );
+
+  ipcMain.handle(
+    'reportes:inasistenciasPeriodo',
+    requirePerm('reportes', async (_e, { ini, fin, empleadoId } = {}) =>
+      reportes.inasistenciasPorPeriodo(ini, fin, empleadoId)
     )
   );
 

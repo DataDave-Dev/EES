@@ -1,13 +1,14 @@
 window.EES_PERMISSIONS = (() => {
   // Keep keys in sync with ALL_MODULES in src/main/db.js.
   const MODULES = [
-    { key: 'registro',  label: 'Registro' },
-    { key: 'empleados', label: 'Empleados' },
-    { key: 'catalogos', label: 'Catálogos' },
-    { key: 'reportes',  label: 'Reportes' },
-    { key: 'usuarios',  label: 'Usuarios' },
-    { key: 'accesos',   label: 'Accesos' },
-    { key: 'auditoria', label: 'Auditoría' },
+    { key: 'registro',      label: 'Registro' },
+    { key: 'inasistencias', label: 'Inasistencias' },
+    { key: 'empleados',     label: 'Empleados' },
+    { key: 'catalogos',     label: 'Catálogos' },
+    { key: 'reportes',      label: 'Reportes' },
+    { key: 'usuarios',      label: 'Usuarios' },
+    { key: 'accesos',       label: 'Accesos' },
+    { key: 'auditoria',     label: 'Auditoría' },
   ];
 
   const ALWAYS_VISIBLE = new Set(['dashboard', 'apariencia']);
@@ -15,10 +16,12 @@ window.EES_PERMISSIONS = (() => {
   // Sub-views that inherit permission from a parent module.
   const VIEW_TO_PERM = {
     'tipos-salida': 'catalogos',
+    'motivos-inasistencia': 'catalogos',
     'rep-asistencia-dia': 'reportes',
     'rep-historial': 'reportes',
     'rep-salidas-motivo': 'reportes',
     'rep-horas-dentro-fuera': 'reportes',
+    'rep-inasistencias': 'reportes',
     'configuracion-general': 'usuarios',
   };
 

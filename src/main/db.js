@@ -9,7 +9,7 @@ let db = null;
 // Main process can't share modules with the renderer directly; if you add
 // a module here, add its { key, label } there too.
 const ALL_MODULES = [
-  'registro', 'empleados', 'catalogos', 'reportes', 'usuarios', 'accesos', 'auditoria',
+  'registro', 'inasistencias', 'empleados', 'catalogos', 'reportes', 'usuarios', 'accesos', 'auditoria',
 ];
 
 // Allowed theme/accent keys. Keep in sync with ACCENTS in shared/theme.js.
@@ -114,6 +114,44 @@ function initSchema(database) {
     -- (motivos, salidas por motivo, KPIs entradas/salidas hoy).
     CREATE INDEX IF NOT EXISTS idx_registro_tipo_ts ON registro_eventos(tipo, timestamp);
 
+    -- Inasistencias: ausencias registradas explícitamente con motivo opcional y
+    -- archivo de evidencia (PDF/imagen) copiado a userData/evidencias/.
+    -- fecha_ini y fecha_fin son 'YYYY-MM-DD' locales (no UTC); el rango es
+    -- inclusivo. evidencia_path es relativa a userData/evidencias/.
+    CREATE TABLE IF NOT EXISTS inasistencias (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id         INTEGER NOT NULL,
+      fecha_ini           TEXT    NOT NULL,
+      fecha_fin           TEXT    NOT NULL,
+      motivo_tipo         TEXT    NOT NULL,
+      motivo_detalle      TEXT,
+      evidencia_filename  TEXT,
+      evidencia_path      TEXT,
+      evidencia_mime      TEXT,
+      registrado_por      INTEGER NOT NULL,
+      fecha_creacion      TEXT    NOT NULL DEFAULT (datetime('now')),
+      fecha_modificacion  TEXT    NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (empleado_id)    REFERENCES empleados(id),
+      FOREIGN KEY (registrado_por) REFERENCES users(id),
+      CHECK (fecha_fin >= fecha_ini)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_inasistencias_emp_rango ON inasistencias(empleado_id, fecha_ini, fecha_fin);
+    CREATE INDEX IF NOT EXISTS idx_inasistencias_rango     ON inasistencias(fecha_ini, fecha_fin);
+
+    CREATE TRIGGER IF NOT EXISTS trg_inasistencias_updated
+    AFTER UPDATE ON inasistencias
+    FOR EACH ROW
+    WHEN OLD.empleado_id    IS NOT NEW.empleado_id
+      OR OLD.fecha_ini      IS NOT NEW.fecha_ini
+      OR OLD.fecha_fin      IS NOT NEW.fecha_fin
+      OR OLD.motivo_tipo    IS NOT NEW.motivo_tipo
+      OR OLD.motivo_detalle IS NOT NEW.motivo_detalle
+      OR OLD.evidencia_path IS NOT NEW.evidencia_path
+    BEGIN
+      UPDATE inasistencias SET fecha_modificacion = datetime('now') WHERE id = OLD.id;
+    END;
+
     -- Catálogo genérico (salida_tipos, en el futuro puestos, departamentos, etc.)
     CREATE TABLE IF NOT EXISTS catalogo_items (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -214,6 +252,32 @@ function initSchema(database) {
     seed();
   }
 
+  // Seed default inasistencia motivos if catalog still empty.
+  // Los valores marcados como "justificadas" en src/main/inasistencias.js
+  // (JUSTIFICADAS) usan EXACTAMENTE estos textos como llave. Si se cambian
+  // aquí, actualizar también esa constante para no romper la clasificación.
+  const seedInaCount = database
+    .prepare("SELECT COUNT(*) AS c FROM catalogo_items WHERE catalogo = 'inasistencia_motivos'")
+    .get().c;
+  if (seedInaCount === 0) {
+    const defaultInaMotivos = [
+      'Justificada',
+      'Injustificada',
+      'Vacaciones',
+      'Incapacidad médica',
+      'Permiso',
+      'Día económico',
+      'Otro',
+    ];
+    const ins = database.prepare(
+      'INSERT INTO catalogo_items (catalogo, valor, orden) VALUES (?, ?, ?)'
+    );
+    const seed = database.transaction(() => {
+      defaultInaMotivos.forEach((v, i) => ins.run('inasistencia_motivos', v, i));
+    });
+    seed();
+  }
+
   // Migration: add theme/accent columns to pre-existing users tables.
   const cols = database.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!cols.includes('theme')) {
@@ -258,6 +322,29 @@ function initSchema(database) {
       }
     });
     seed();
+  }
+
+  // One-time migration: conceder permiso 'inasistencias' a usuarios existentes
+  // que ya tenían permisos asignados antes de que el módulo existiera. Sin esto
+  // tendrían que ir a Accesos a marcarlo manualmente. Se gatea con una clave en
+  // app_settings para correr una sola vez.
+  const inaMigrated = database
+    .prepare("SELECT value FROM app_settings WHERE key = 'migration_inasistencias_grant'")
+    .get();
+  if (!inaMigrated) {
+    if (hasUsers) {
+      const ids = database.prepare('SELECT id FROM users').all();
+      const insert = database.prepare(
+        "INSERT OR IGNORE INTO user_permissions (user_id, permission) VALUES (?, 'inasistencias')"
+      );
+      const grant = database.transaction(() => {
+        for (const { id } of ids) insert.run(id);
+      });
+      grant();
+    }
+    database
+      .prepare("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('migration_inasistencias_grant', '1')")
+      .run();
   }
 }
 

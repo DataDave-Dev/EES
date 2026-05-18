@@ -24,6 +24,10 @@ const ACTIONS = [
   'evento.create',
   'evento.update',
   'evento.delete',
+  // Inasistencias
+  'inasistencia.create',
+  'inasistencia.update',
+  'inasistencia.delete',
   // Catálogos
   'catalogo.create',
   'catalogo.update',

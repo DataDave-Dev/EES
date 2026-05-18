@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; img-src 'self' data:" />
+  <title>Onix · Inasistencia</title>
+  <link rel="stylesheet" href="../../styles/output.css" />
+  <script src="../shared/theme.js"></script>
+</head>
+<body class="h-screen overflow-hidden">
+  <div class="regn-page">
+    <header class="regn-header">
+      <button type="button" id="ina-back" class="regn-back-btn" aria-label="Volver">
+        <span id="ina-back-icon"></span>
+        <span>Volver</span>
+      </button>
+      <div class="regn-header-title">
+        <div class="identity-sub" style="color: var(--accent);">Asistencia</div>
+        <h1 class="regn-title" id="ina-page-title">Nueva inasistencia</h1>
+      </div>
+      <div></div>
+    </header>
+
+    <main class="regn-main">
+      <div class="window regn-card">
+
+        <!-- Paso 1: Empleado -->
+        <section class="reg-step" data-step="1">
+          <div class="reg-step-head">
+            <div class="reg-step-title">
+              <span class="reg-step-num">1</span>
+              <span class="reg-step-label">Empleado</span>
+            </div>
+          </div>
+          <div class="reg-step-body">
+            <div class="reg-search-shell">
+              <span class="reg-search-icon" id="ina-search-icon"></span>
+              <input
+                type="text"
+                id="ina-search"
+                class="reg-search-input"
+                placeholder="Buscar por número o nombre…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <div id="ina-results" class="reg-results hidden"></div>
+            <div id="ina-selected" class="reg-selected hidden"></div>
+          </div>
+        </section>
+
+        <!-- Paso 2 y 3 en grid -->
+        <div class="reg-steps-grid">
+          <!-- Paso 2: Periodo -->
+          <section class="reg-step reg-step--disabled" id="ina-step-periodo" data-step="2">
+            <div class="reg-step-head">
+              <div class="reg-step-title">
+                <span class="reg-step-num">2</span>
+                <span class="reg-step-label">Periodo</span>
+              </div>
+              <button type="button" id="ina-step-today" class="reg-section-link" title="Sólo hoy">
+                <span id="ina-today-icon"></span>
+                <span>Sólo hoy</span>
+              </button>
+            </div>
+            <div class="reg-step-body">
+              <div class="reg-clock-grid">
+                <label class="field reg-clock-field">
+                  <span class="field-label">Desde</span>
+                  <span class="field-shell">
+                    <input type="date" id="ina-fecha-ini" class="field-input reg-clock-input" />
+                  </span>
+                </label>
+                <label class="field reg-clock-field">
+                  <span class="field-label">Hasta</span>
+                  <span class="field-shell">
+                    <input type="date" id="ina-fecha-fin" class="field-input reg-clock-input" />
+                  </span>
+                </label>
+              </div>
+              <span class="field-hint" id="ina-periodo-hint">Acepta un solo día o un rango (vacaciones, incapacidad).</span>
+            </div>
+          </section>
+
+          <!-- Paso 3: Motivo -->
+          <section class="reg-step reg-step--disabled" id="ina-step-motivo" data-step="3">
+            <div class="reg-step-head">
+              <div class="reg-step-title">
+                <span class="reg-step-num">3</span>
+                <span class="reg-step-label">Motivo</span>
+              </div>
+            </div>
+            <div class="reg-step-body">
+              <label class="field">
+                <span class="field-label">Tipo</span>
+                <span class="field-shell select-shell">
+                  <select id="ina-motivo-tipo" class="field-input field-select">
+                    <option value="">Selecciona…</option>
+                  </select>
+                </span>
+              </label>
+              <label class="field">
+                <span class="field-label">Detalle <span class="users-muted">(opcional)</span></span>
+                <span class="field-shell" style="height: auto; padding: 8px 12px; align-items: flex-start;">
+                  <textarea id="ina-motivo-detalle" class="field-input" rows="2" maxlength="500" autocomplete="off" style="resize: vertical; height: auto; min-height: 32px;"></textarea>
+                </span>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <!-- Paso 4: Evidencia -->
+        <section class="reg-step reg-step--disabled" id="ina-step-evidencia" data-step="4">
+          <div class="reg-step-head">
+            <div class="reg-step-title">
+              <span class="reg-step-num">4</span>
+              <span class="reg-step-label">Evidencia <span class="users-muted" style="font-weight: 400; font-size: 12px;">(opcional)</span></span>
+            </div>
+            <span class="field-hint" style="margin: 0;">PDF, PNG, JPG o WebP. Máx 5 MB.</span>
+          </div>
+          <div class="reg-step-body">
+            <div id="ina-evidencia-current" class="reg-status-line hidden">—</div>
+            <div class="ina-evidencia-actions">
+              <label class="btn-ghost-outline ina-evidencia-upload" for="ina-evidencia-file">
+                <span id="ina-evidencia-icon"></span>
+                <span id="ina-evidencia-label-text">Cargar archivo</span>
+              </label>
+              <input type="file" id="ina-evidencia-file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" class="hidden" />
+              <button type="button" id="ina-evidencia-clear" class="btn-ghost-outline hidden">Quitar adjunto</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Paso 5 (sólo edición): Confirmación -->
+        <section class="reg-step" id="ina-step-pw" data-step="5" style="display: none;">
+          <div class="reg-step-head">
+            <div class="reg-step-title">
+              <span class="reg-step-num">5</span>
+              <span class="reg-step-label">Confirmación</span>
+            </div>
+          </div>
+          <div class="reg-step-body">
+            <label class="field">
+              <span class="field-label">Contraseña actual</span>
+              <span class="field-shell">
+                <input type="password" id="ina-pw" class="field-input" autocomplete="current-password" placeholder="Para guardar los cambios" />
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <div id="ina-error" class="alert-error hidden"></div>
+
+        <!-- Acciones -->
+        <div class="reg-actions-grid">
+          <button type="button" id="ina-cancel" class="reg-action-btn ina-action-btn--ghost">
+            <span>Cancelar</span>
+          </button>
+          <button type="button" id="ina-submit" class="reg-action-btn reg-action-btn--in" disabled>
+            <span id="ina-submit-icon"></span>
+            <span id="ina-submit-label">Guardar inasistencia</span>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../shared/icons.js"></script>
+  <script src="../shared/permissions.js"></script>
+  <script src="../shared/brand.js"></script>
+  <script src="../shared/time.js"></script>
+  <script src="../shared/toast.js"></script>
+  <script src="inasistencia-nuevo.js"></script>
+</body>
+</html>

@@ -28,6 +28,10 @@
           <span class="nav-icon" id="nav-icon-registro"></span>
           <span class="nav-label">Registro</span>
         </button>
+        <button type="button" class="nav-item" data-view="inasistencias">
+          <span class="nav-icon" id="nav-icon-inasistencias"></span>
+          <span class="nav-label">Inasistencias</span>
+        </button>
         <button type="button" class="nav-item" data-view="empleados">
           <span class="nav-icon" id="nav-icon-empleados"></span>
           <span class="nav-label">Empleados</span>
@@ -43,6 +47,10 @@
               <button type="button" class="nav-item nav-sub" data-view="tipos-salida">
                 <span class="nav-icon" id="nav-icon-tipos-salida"></span>
                 <span class="nav-label">Motivos</span>
+              </button>
+              <button type="button" class="nav-item nav-sub" data-view="motivos-inasistencia">
+                <span class="nav-icon" id="nav-icon-motivos-inasistencia"></span>
+                <span class="nav-label">Motivos de inasistencia</span>
               </button>
             </div>
           </div>
@@ -71,6 +79,10 @@
               <button type="button" class="nav-item nav-sub" data-view="rep-horas-dentro-fuera">
                 <span class="nav-icon" id="nav-icon-rep-horas"></span>
                 <span class="nav-label">Horas dentro/fuera</span>
+              </button>
+              <button type="button" class="nav-item nav-sub" data-view="rep-inasistencias">
+                <span class="nav-icon" id="nav-icon-rep-inasistencias"></span>
+                <span class="nav-label">Inasistencias por periodo</span>
               </button>
             </div>
           </div>
@@ -294,6 +306,111 @@
                 </thead>
                 <tbody id="empleados-tbody">
                   <tr class="users-empty-row"><td colspan="6">Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Inasistencias view -->
+        <section class="view" data-view="inasistencias">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Inasistencias</h2>
+              <p class="users-sub">
+                <span id="ina-count">—</span> inasistencias registradas.
+                <button type="button" id="ina-refresh" class="users-refresh-link">Actualizar</button>
+              </p>
+            </div>
+            <button type="button" id="ina-new-btn" class="btn-primary users-new-btn">
+              <span id="icon-ina-new"></span>
+              <span>Nueva inasistencia</span>
+            </button>
+          </div>
+
+          <div class="rep-filter-bar">
+            <div class="rep-filter-item" style="flex: 2 1 260px;">
+              <span class="rep-filter-item-label">Empleado</span>
+              <span class="rep-filter-shell select-shell">
+                <select id="ina-fil-empleado" class="rep-filter-input field-select">
+                  <option value="">Todos</option>
+                </select>
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Desde</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="ina-fil-ini" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Hasta</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="ina-fil-fin" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item" style="flex: 1.4 1 180px;">
+              <span class="rep-filter-item-label">Motivo</span>
+              <span class="rep-filter-shell select-shell">
+                <select id="ina-fil-motivo" class="rep-filter-input field-select">
+                  <option value="">Todos</option>
+                </select>
+              </span>
+            </div>
+            <button type="button" id="ina-fil-aplicar" class="btn-primary rep-generate-btn">Aplicar</button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Empleado</th>
+                    <th style="width: 22%;">Rango</th>
+                    <th style="width: 7%; text-align: right;">Días</th>
+                    <th style="width: 14%;">Motivo</th>
+                    <th>Detalle</th>
+                    <th style="width: 10%;">Evidencia</th>
+                    <th style="width: 12%;">Registró</th>
+                    <th class="users-actions-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="ina-tbody">
+                  <tr class="users-empty-row"><td colspan="8">Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Motivos de inasistencia (sub-vista de Catálogos) -->
+        <section class="view" data-view="motivos-inasistencia">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Motivos de inasistencia</h2>
+              <p class="users-sub">
+                <span id="mina-count">—</span> motivos registrados. Aplica al módulo de inasistencias.
+                <button type="button" id="mina-refresh" class="users-refresh-link">Actualizar</button>
+              </p>
+            </div>
+            <button type="button" id="mina-new-btn" class="btn-primary users-new-btn">
+              <span id="icon-mina-new"></span>
+              <span>Nuevo motivo</span>
+            </button>
+          </div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th style="width: 22%;">Clasificación</th>
+                    <th class="users-actions-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="mina-tbody">
+                  <tr class="users-empty-row"><td colspan="3">Cargando…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -549,16 +666,6 @@
 
           <div id="rep-sm-summary" class="rep-summary rep-summary--cards hidden"></div>
 
-          <div id="rep-sm-chart" class="window dash-card rep-sm-chart hidden">
-            <div class="dash-card-head">
-              <div>
-                <h3 class="dash-card-title">Distribución por motivo</h3>
-                <span class="dash-card-sub" id="rep-sm-chart-sub">—</span>
-              </div>
-            </div>
-            <div id="rep-sm-chart-body" class="rep-sm-chart-body"></div>
-          </div>
-
           <div class="window users-card">
             <div class="users-table-wrap">
               <table class="users-table rep-sm-table">
@@ -633,6 +740,71 @@
                 </thead>
                 <tbody id="rep-hd-tbody">
                   <tr class="users-empty-row"><td colspan="6">Selecciona rango y presiona Generar.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reporte: Inasistencias por periodo -->
+        <section class="view" data-view="rep-inasistencias">
+          <div class="users-toolbar">
+            <div class="users-toolbar-info">
+              <h2 class="users-h2">Inasistencias por periodo</h2>
+              <p class="users-sub">Listado de inasistencias registradas en un rango, con totales por motivo y empleado.</p>
+            </div>
+            <div class="rep-toolbar-actions">
+              <button type="button" id="rep-in-xlsx" class="rep-export-btn" disabled>
+                <span id="rep-in-xlsx-icon"></span>
+                <span>Excel</span>
+              </button>
+              <button type="button" id="rep-in-pdf" class="rep-export-btn" disabled>
+                <span id="rep-in-pdf-icon"></span>
+                <span>PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="rep-filter-bar">
+            <div class="rep-filter-item" style="flex: 2 1 240px;">
+              <span class="rep-filter-item-label">Empleado</span>
+              <span class="rep-filter-shell select-shell">
+                <select id="rep-in-empleado" class="rep-filter-input field-select">
+                  <option value="">Todos</option>
+                </select>
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Desde</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-in-ini" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item">
+              <span class="rep-filter-item-label">Hasta</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-in-fin" class="rep-filter-input" />
+              </span>
+            </div>
+            <button type="button" id="rep-in-buscar" class="btn-primary rep-generate-btn">Generar reporte</button>
+          </div>
+
+          <div id="rep-in-summary" class="rep-summary rep-summary--cards hidden"></div>
+
+          <div class="window users-card">
+            <div class="users-table-wrap">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Empleado</th>
+                    <th style="width: 22%;">Rango</th>
+                    <th style="width: 7%; text-align: right;">Días</th>
+                    <th style="width: 16%;">Motivo</th>
+                    <th>Detalle</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-in-tbody">
+                  <tr class="users-empty-row"><td colspan="5">Selecciona rango y presiona Generar.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -952,6 +1124,59 @@
       <footer class="modal-foot">
         <button type="button" class="btn-ghost-outline" data-empmodal-close>Cancelar</button>
         <button type="submit" form="empleado-form" id="em-submit" class="btn-primary btn-primary--auto">Guardar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Inasistencia delete modal -->
+  <div id="ina-del-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="ina-del-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="ina-del-modal-title">Eliminar inasistencia</h2>
+        <button type="button" class="modal-close-btn" data-inadelmodal-close aria-label="Cerrar">
+          <span id="icon-inadelmodal-close"></span>
+        </button>
+      </header>
+      <form id="ina-del-form" class="modal-body" novalidate>
+        <p style="margin: 0 0 4px; color: var(--text); font-size: 14px;">¿Eliminar esta inasistencia permanentemente?</p>
+        <div class="evt-del-summary" id="ina-del-summary">—</div>
+        <div class="evt-pw-block">
+          <span class="reg-form-label" style="display:block; margin-bottom: 6px;">Confirma tu contraseña para eliminar</span>
+          <span class="field-shell">
+            <input type="password" id="ina-del-pw" class="field-input" autocomplete="current-password" placeholder="Tu contraseña actual" />
+          </span>
+        </div>
+        <div id="ina-del-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-inadelmodal-close>Cancelar</button>
+        <button type="submit" form="ina-del-form" id="ina-del-submit" class="btn-primary btn-primary--auto" style="background: var(--error);">Eliminar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Motivo de inasistencia create/edit modal -->
+  <div id="mina-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="mina-modal-title">
+    <div class="modal">
+      <header class="modal-header">
+        <h2 class="modal-title" id="mina-modal-title">Nuevo motivo</h2>
+        <button type="button" class="modal-close-btn" data-minamodal-close aria-label="Cerrar">
+          <span id="icon-minamodal-close"></span>
+        </button>
+      </header>
+      <form id="mina-form" class="modal-body" novalidate>
+        <label class="field">
+          <span class="field-label">Nombre del motivo</span>
+          <span class="field-shell">
+            <input class="field-input" type="text" id="mina-valor" autocomplete="off" maxlength="64" />
+          </span>
+          <span class="field-hint">Máximo 64 caracteres. Si coincide con un nombre reservado (Vacaciones, Permiso, Incapacidad médica, Día económico, Justificada) se contará como ausencia justificada.</span>
+        </label>
+        <div id="mina-error" class="alert-error hidden"></div>
+      </form>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ghost-outline" data-minamodal-close>Cancelar</button>
+        <button type="submit" form="mina-form" id="mina-submit" class="btn-primary btn-primary--auto">Guardar</button>
       </footer>
     </div>
   </div>

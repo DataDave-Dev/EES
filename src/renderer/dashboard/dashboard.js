@@ -10,6 +10,7 @@ document.getElementById('icon-logout').innerHTML = I.logout(15);
 document.getElementById('icon-menu').innerHTML = I.menu(18);
 document.getElementById('nav-icon-dashboard').innerHTML = I.dashboard(17);
 document.getElementById('nav-icon-registro').innerHTML = I.registro(17);
+document.getElementById('nav-icon-inasistencias').innerHTML = I.calendarX(17);
 document.getElementById('nav-icon-empleados').innerHTML = I.empleados(17);
 document.getElementById('nav-icon-catalogos').innerHTML = I.catalogos(17);
 document.getElementById('nav-icon-configuracion').innerHTML = I.settings(17);
@@ -1550,12 +1551,15 @@ regLogTbody.addEventListener('click', (e) => {
 const VIEWS = {
   dashboard:                { eyebrow: 'Panel',         title: 'Dashboard' },
   registro:                 { eyebrow: 'Asistencia',    title: 'Registro' },
+  inasistencias:            { eyebrow: 'Asistencia',    title: 'Inasistencias' },
   empleados:                { eyebrow: 'Personal',      title: 'Empleados' },
   'tipos-salida':           { eyebrow: 'Catálogos',     title: 'Motivos' },
+  'motivos-inasistencia':   { eyebrow: 'Catálogos',     title: 'Motivos de inasistencia' },
   'rep-asistencia-dia':     { eyebrow: 'Reportes',      title: 'Asistencia del día' },
   'rep-historial':          { eyebrow: 'Reportes',      title: 'Historial por empleado' },
   'rep-salidas-motivo':     { eyebrow: 'Reportes',      title: 'Salidas por motivo' },
   'rep-horas-dentro-fuera': { eyebrow: 'Reportes',      title: 'Horas dentro/fuera' },
+  'rep-inasistencias':      { eyebrow: 'Reportes',      title: 'Inasistencias por periodo' },
   'configuracion-general':  { eyebrow: 'Configuración', title: 'General' },
   usuarios:                 { eyebrow: 'Configuración', title: 'Usuarios' },
   accesos:                  { eyebrow: 'Configuración', title: 'Accesos' },
@@ -1563,8 +1567,8 @@ const VIEWS = {
   apariencia:               { eyebrow: 'Configuración', title: 'Apariencia' },
 };
 const CONFIG_VIEWS = new Set(['configuracion-general', 'usuarios', 'accesos', 'auditoria', 'apariencia']);
-const CATALOGOS_VIEWS = new Set(['tipos-salida']);
-const REPORTES_VIEWS = new Set(['rep-asistencia-dia', 'rep-historial', 'rep-salidas-motivo', 'rep-horas-dentro-fuera']);
+const CATALOGOS_VIEWS = new Set(['tipos-salida', 'motivos-inasistencia']);
+const REPORTES_VIEWS = new Set(['rep-asistencia-dia', 'rep-historial', 'rep-salidas-motivo', 'rep-horas-dentro-fuera', 'rep-inasistencias']);
 
 const navItems = document.querySelectorAll('#sidebar-nav .nav-item[data-view]');
 const viewEls = document.querySelectorAll('.view');
@@ -1578,12 +1582,14 @@ const reportesGroup = document.getElementById('nav-group-reportes');
 const reportesToggle = reportesGroup.querySelector('.nav-group-toggle');
 document.getElementById('nav-icon-chevron-catalogos').innerHTML = I.chevron(13);
 document.getElementById('nav-icon-tipos-salida').innerHTML = I.clipboard(15);
+document.getElementById('nav-icon-motivos-inasistencia').innerHTML = I.calendarX(15);
 document.getElementById('nav-icon-reportes').innerHTML = I.clipboard(17);
 document.getElementById('nav-icon-chevron-reportes').innerHTML = I.chevron(13);
 document.getElementById('nav-icon-rep-asistencia').innerHTML = I.registro(15);
 document.getElementById('nav-icon-rep-historial').innerHTML = I.user(15);
 document.getElementById('nav-icon-rep-salidas').innerHTML = I.exit(15);
 document.getElementById('nav-icon-rep-horas').innerHTML = I.clipboard(15);
+document.getElementById('nav-icon-rep-inasistencias').innerHTML = I.calendarX(15);
 document.getElementById('nav-icon-configuracion-general').innerHTML = I.settings(15);
 
 function setGroupOpen(open) {
@@ -1626,6 +1632,9 @@ function switchView(key) {
   if (key === 'dashboard') startDashboardAutoRefresh();
   else stopDashboardAutoRefresh();
   if (key === 'tipos-salida') loadTiposAll();
+  if (key === 'motivos-inasistencia') loadMotivosInasistencia();
+  if (key === 'inasistencias') initInasistenciasView();
+  if (key === 'rep-inasistencias') initRepInasistenciasView();
 }
 navItems.forEach((btn) => {
   btn.addEventListener('click', () => switchView(btn.dataset.view));
@@ -3279,3 +3288,541 @@ function renderSwatches() {
   });
 }
 renderSwatches();
+
+// ── Motivos de inasistencia (sub-vista de Catálogos) ──────────
+const minaTbody = document.getElementById('mina-tbody');
+const minaCount = document.getElementById('mina-count');
+const minaModal = document.getElementById('mina-modal');
+const minaForm = document.getElementById('mina-form');
+const minaModalTitle = document.getElementById('mina-modal-title');
+const minaValor = document.getElementById('mina-valor');
+const minaError = document.getElementById('mina-error');
+const minaSubmit = document.getElementById('mina-submit');
+let minaCache = [];
+let minaEditingId = null;
+let minaSubmitToken = 0;
+
+// Espejo de JUSTIFICADAS en src/main/inasistencias.js. Si cambias allí, cambia aquí.
+const INA_JUSTIFICADAS = new Set([
+  'Justificada', 'Vacaciones', 'Incapacidad médica', 'Permiso', 'Día económico',
+]);
+
+document.getElementById('icon-mina-new').innerHTML = I.plus(12);
+document.getElementById('icon-minamodal-close').innerHTML = I.close(16);
+
+function renderMinaRows(list) {
+  if (!list.length) {
+    minaTbody.innerHTML = '<tr class="users-empty-row"><td colspan="3">No hay motivos registrados.</td></tr>';
+    return;
+  }
+  minaTbody.innerHTML = list.map((t) => {
+    const just = INA_JUSTIFICADAS.has(t.valor);
+    const badge = just
+      ? '<span class="reg-tipo-badge reg-tipo-badge--in">Justificada</span>'
+      : '<span class="reg-tipo-badge reg-tipo-badge--out">Injustificada</span>';
+    return `
+      <tr>
+        <td><div class="user-cell-name">${escapeHtml(t.valor)}</div></td>
+        <td>${badge}</td>
+        <td>
+          <div class="users-row-actions">
+            <button type="button" class="row-icon-btn" data-mina-action="edit" data-id="${t.id}" title="Editar" aria-label="Editar">${I.edit(15)}</button>
+            <button type="button" class="row-icon-btn row-icon-btn--danger" data-mina-action="delete" data-id="${t.id}" title="Eliminar" aria-label="Eliminar">${I.trash(15)}</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadMotivosInasistencia() {
+  minaTbody.innerHTML = '<tr class="users-empty-row"><td colspan="3">Cargando…</td></tr>';
+  minaCount.textContent = '—';
+  const res = await window.api.listCatalogoAll('inasistencia_motivos');
+  if (!res?.ok) {
+    minaTbody.innerHTML = `<tr class="users-empty-row"><td colspan="3">${escapeHtml(res?.error || 'No se pudieron cargar los motivos.')}</td></tr>`;
+    return;
+  }
+  minaCache = res.items;
+  minaCount.textContent = String(res.items.length);
+  renderMinaRows(res.items);
+}
+
+function openMinaModal(item = null) {
+  minaEditingId = item?.id ?? null;
+  minaError.classList.add('hidden');
+  minaError.textContent = '';
+  if (item) {
+    minaModalTitle.textContent = 'Editar motivo';
+    minaValor.value = item.valor || '';
+  } else {
+    minaModalTitle.textContent = 'Nuevo motivo';
+    minaValor.value = '';
+  }
+  rememberFocus(minaModal);
+  minaModal.classList.remove('hidden');
+  setTimeout(() => minaValor.focus(), 30);
+}
+
+function closeMinaModal() {
+  minaModal.classList.add('hidden');
+  restoreFocus(minaModal);
+  minaEditingId = null;
+  minaSubmitToken++;
+}
+
+minaModal.addEventListener('click', (e) => {
+  if (e.target === minaModal || e.target.closest('[data-minamodal-close]')) {
+    closeMinaModal();
+  }
+});
+
+document.getElementById('mina-new-btn').addEventListener('click', () => openMinaModal(null));
+document.getElementById('mina-refresh').addEventListener('click', loadMotivosInasistencia);
+
+minaForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  minaError.classList.add('hidden');
+  minaError.textContent = '';
+  const valor = minaValor.value.trim();
+  if (!valor) {
+    minaError.textContent = 'Escribe un nombre.';
+    minaError.classList.remove('hidden');
+    return;
+  }
+  const myToken = ++minaSubmitToken;
+  minaSubmit.disabled = true;
+  const prevLabel = minaSubmit.textContent;
+  minaSubmit.textContent = minaEditingId ? 'Guardando…' : 'Creando…';
+
+  const res = minaEditingId
+    ? await window.api.updateCatalogoItem(minaEditingId, valor)
+    : await window.api.addCatalogoItem('inasistencia_motivos', valor);
+
+  if (myToken !== minaSubmitToken) return;
+  minaSubmit.disabled = false;
+  minaSubmit.textContent = prevLabel;
+
+  if (!res?.ok) {
+    minaError.textContent = res?.error || 'No se pudo guardar';
+    minaError.classList.remove('hidden');
+    return;
+  }
+  closeMinaModal();
+  await loadMotivosInasistencia();
+});
+
+minaTbody.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-mina-action]');
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  const item = minaCache.find((x) => x.id === id);
+  if (!item) return;
+
+  if (btn.dataset.minaAction === 'edit') {
+    openMinaModal(item);
+    return;
+  }
+  if (btn.dataset.minaAction === 'delete') {
+    const ok = window.confirm(
+      `¿Eliminar permanentemente "${item.valor}"?\n\nLas inasistencias pasadas que lo usaron conservarán el nombre en el histórico, pero ya no podrá seleccionarse para nuevos registros.`
+    );
+    if (!ok) return;
+    btn.disabled = true;
+    const res = await window.api.deleteCatalogoItem(id);
+    if (!res?.ok) {
+      EES_TOAST.error(res?.error || 'No se pudo eliminar');
+      btn.disabled = false;
+      return;
+    }
+    await loadMotivosInasistencia();
+  }
+});
+
+// ── Inasistencias view ────────────────────────────────────────
+const inaTbody = document.getElementById('ina-tbody');
+const inaCount = document.getElementById('ina-count');
+const inaFilEmpleado = document.getElementById('ina-fil-empleado');
+const inaFilIni = document.getElementById('ina-fil-ini');
+const inaFilFin = document.getElementById('ina-fil-fin');
+const inaFilMotivo = document.getElementById('ina-fil-motivo');
+const inaFilAplicar = document.getElementById('ina-fil-aplicar');
+const inaRefresh = document.getElementById('ina-refresh');
+const inaNewBtn = document.getElementById('ina-new-btn');
+
+const inaDelModal = document.getElementById('ina-del-modal');
+const inaDelForm = document.getElementById('ina-del-form');
+const inaDelSummary = document.getElementById('ina-del-summary');
+const inaDelPw = document.getElementById('ina-del-pw');
+const inaDelError = document.getElementById('ina-del-error');
+const inaDelSubmit = document.getElementById('ina-del-submit');
+
+document.getElementById('icon-ina-new').innerHTML = I.plus(12);
+document.getElementById('icon-inadelmodal-close').innerHTML = I.close(16);
+
+let inaCache = [];
+let inaEmpleadosLoaded = false;
+let inaMotivosLoaded = false;
+let inaInitialized = false;
+let inaDeletingRecord = null;
+
+(function initInaFilterDates() {
+  const today = new Date();
+  const past = new Date(today); past.setDate(past.getDate() - 30);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  inaFilIni.value = fmt(past);
+  inaFilFin.value = fmt(today);
+})();
+
+async function ensureInaEmpleados() {
+  if (inaEmpleadosLoaded) return;
+  const res = await window.api.listInasistenciasEmpleados();
+  if (!res?.ok) return;
+  const opts = res.empleados.map((e) =>
+    `<option value="${e.id}">#${escapeHtml(e.numero_empleado)} · ${escapeHtml(e.nombre)} ${escapeHtml(e.apellidos)}</option>`
+  ).join('');
+  inaFilEmpleado.innerHTML = '<option value="">Todos</option>' + opts;
+  inaEmpleadosLoaded = true;
+}
+
+async function ensureInaMotivos() {
+  if (inaMotivosLoaded) return;
+  const res = await window.api.listCatalogo('inasistencia_motivos', { activeOnly: true });
+  if (!res?.ok) return;
+  const opts = res.items.map((i) =>
+    `<option value="${escapeHtml(i.valor)}">${escapeHtml(i.valor)}</option>`
+  ).join('');
+  inaFilMotivo.innerHTML = '<option value="">Todos</option>' + opts;
+  inaMotivosLoaded = true;
+}
+
+async function initInasistenciasView() {
+  if (!inaInitialized) {
+    await Promise.all([ensureInaEmpleados(), ensureInaMotivos()]);
+    inaInitialized = true;
+  }
+  await loadInasistencias();
+}
+
+function fmtRange(ini, fin) {
+  if (ini === fin) return fmtDateLong(ini);
+  return `${fmtDateLong(ini)} → ${fmtDateLong(fin)}`;
+}
+
+function justBadge(j) {
+  return j
+    ? '<span class="reg-tipo-badge reg-tipo-badge--in">Justificada</span>'
+    : '<span class="reg-tipo-badge reg-tipo-badge--out">Injustificada</span>';
+}
+
+function renderInasistencias(rows) {
+  if (!rows.length) {
+    inaTbody.innerHTML = '<tr class="users-empty-row"><td colspan="8">Sin inasistencias en el rango.</td></tr>';
+    inaCount.textContent = '0';
+    return;
+  }
+  inaCount.textContent = String(rows.length);
+  inaTbody.innerHTML = rows.map((r) => {
+    const emp = r.empleado || {};
+    const evidenciaCell = r.evidencia
+      ? `<button type="button" class="row-icon-btn" data-ina-action="evidencia" data-id="${r.id}" title="Abrir ${escapeHtml(r.evidencia.filename || 'evidencia')}" aria-label="Abrir evidencia">${I.paperclip(15)}</button>`
+      : '<span class="users-muted">—</span>';
+    return `
+      <tr>
+        <td>
+          <div class="user-cell">
+            <div class="user-cell-text">
+              <div class="user-cell-name">${escapeHtml(emp.nombre || '')} ${escapeHtml(emp.apellidos || '')}</div>
+              <div class="user-cell-handle">#${escapeHtml(emp.numero_empleado || '')}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="user-cell-handle">${escapeHtml(fmtRange(r.fecha_ini, r.fecha_fin))}</span></td>
+        <td style="text-align:right;">${r.dias}</td>
+        <td>
+          <div class="user-cell-text">
+            <div>${escapeHtml(r.motivo_tipo)}</div>
+            <div>${justBadge(r.justificada)}</div>
+          </div>
+        </td>
+        <td>${r.motivo_detalle ? escapeHtml(r.motivo_detalle) : '<span class="users-muted">—</span>'}</td>
+        <td>${evidenciaCell}</td>
+        <td><span class="users-muted">@${escapeHtml(r.registrado_por_username || '')}</span></td>
+        <td>
+          <div class="users-row-actions">
+            <button type="button" class="row-icon-btn" data-ina-action="edit" data-id="${r.id}" title="Editar" aria-label="Editar">${I.edit(15)}</button>
+            <button type="button" class="row-icon-btn row-icon-btn--danger" data-ina-action="delete" data-id="${r.id}" title="Eliminar" aria-label="Eliminar">${I.trash(15)}</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadInasistencias() {
+  inaTbody.innerHTML = '<tr class="users-empty-row"><td colspan="8">Cargando…</td></tr>';
+  const filtros = {
+    empleadoId: inaFilEmpleado.value ? Number(inaFilEmpleado.value) : null,
+    ini: inaFilIni.value || null,
+    fin: inaFilFin.value || null,
+    motivoTipo: inaFilMotivo.value || null,
+  };
+  const res = await window.api.listInasistencias(filtros);
+  if (!res?.ok) {
+    inaTbody.innerHTML = `<tr class="users-empty-row"><td colspan="8">${escapeHtml(res?.error || 'No se pudieron cargar las inasistencias.')}</td></tr>`;
+    return;
+  }
+  inaCache = res.inasistencias;
+  renderInasistencias(res.inasistencias);
+}
+
+inaFilAplicar.addEventListener('click', loadInasistencias);
+inaRefresh.addEventListener('click', loadInasistencias);
+
+inaNewBtn.addEventListener('click', () => {
+  window.location.href = '../inasistencia-nuevo/inasistencia-nuevo.html';
+});
+
+// ── Inasistencia delete modal ────────────────────────────────
+function openInaDelModal(record) {
+  inaDeletingRecord = record;
+  inaDelError.classList.add('hidden');
+  inaDelError.textContent = '';
+  inaDelPw.value = '';
+  const emp = record.empleado || {};
+  inaDelSummary.innerHTML = `
+    <div><strong>${escapeHtml(emp.nombre || '')} ${escapeHtml(emp.apellidos || '')}</strong> · #${escapeHtml(emp.numero_empleado || '')}</div>
+    <div class="user-cell-handle">${escapeHtml(fmtRange(record.fecha_ini, record.fecha_fin))} · ${escapeHtml(record.motivo_tipo)}</div>
+  `;
+  rememberFocus(inaDelModal);
+  inaDelModal.classList.remove('hidden');
+  setTimeout(() => inaDelPw.focus(), 30);
+}
+
+function closeInaDelModal() {
+  inaDelModal.classList.add('hidden');
+  restoreFocus(inaDelModal);
+  inaDeletingRecord = null;
+}
+
+inaDelModal.addEventListener('click', (e) => {
+  if (e.target === inaDelModal || e.target.closest('[data-inadelmodal-close]')) closeInaDelModal();
+});
+
+inaDelForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  inaDelError.classList.add('hidden');
+  if (!inaDelPw.value) {
+    inaDelError.textContent = 'Ingresa tu contraseña para confirmar.';
+    inaDelError.classList.remove('hidden'); return;
+  }
+  inaDelSubmit.disabled = true;
+  const prev = inaDelSubmit.textContent;
+  inaDelSubmit.textContent = 'Eliminando…';
+
+  const res = await window.api.deleteInasistencia(inaDeletingRecord.id, inaDelPw.value);
+
+  inaDelSubmit.disabled = false;
+  inaDelSubmit.textContent = prev;
+
+  if (!res?.ok) {
+    inaDelError.textContent = res?.error || 'No se pudo eliminar';
+    inaDelError.classList.remove('hidden');
+    return;
+  }
+  closeInaDelModal();
+  await loadInasistencias();
+});
+
+inaTbody.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-ina-action]');
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  const rec = inaCache.find((x) => x.id === id);
+  if (!rec) return;
+  const action = btn.dataset.inaAction;
+  if (action === 'edit') {
+    window.location.href = `../inasistencia-nuevo/inasistencia-nuevo.html?id=${id}`;
+  } else if (action === 'delete') {
+    openInaDelModal(rec);
+  } else if (action === 'evidencia') {
+    btn.disabled = true;
+    const res = await window.api.openInasistenciaEvidencia(id);
+    btn.disabled = false;
+    if (!res?.ok) EES_TOAST.error(res?.error || 'No se pudo abrir la evidencia');
+  }
+});
+
+// Escape global cierra cualquier modal de inasistencias / motivos abierto.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!inaDelModal.classList.contains('hidden')) closeInaDelModal();
+  else if (!minaModal.classList.contains('hidden')) closeMinaModal();
+});
+
+// ── Reporte: Inasistencias por periodo ────────────────────────
+const repInIni = document.getElementById('rep-in-ini');
+const repInFin = document.getElementById('rep-in-fin');
+const repInEmp = document.getElementById('rep-in-empleado');
+const repInBuscar = document.getElementById('rep-in-buscar');
+const repInTbody = document.getElementById('rep-in-tbody');
+const repInSummary = document.getElementById('rep-in-summary');
+const repInXlsx = document.getElementById('rep-in-xlsx');
+const repInPdf = document.getElementById('rep-in-pdf');
+document.getElementById('rep-in-xlsx-icon').innerHTML = I.fileSpreadsheet(14);
+document.getElementById('rep-in-pdf-icon').innerHTML = I.filePdf(14);
+let repInData = null;
+let repInEmpleadosLoaded = false;
+
+(function initRepInDates() {
+  const today = new Date();
+  const past = new Date(today); past.setDate(past.getDate() - 29);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  repInIni.value = fmt(past);
+  repInFin.value = fmt(today);
+})();
+
+async function initRepInasistenciasView() {
+  if (repInEmpleadosLoaded) return;
+  const res = await window.api.reporteListEmpleados();
+  if (!res?.ok) return;
+  repInEmp.innerHTML = '<option value="">Todos</option>' + res.empleados.map((e) =>
+    `<option value="${e.id}">#${escapeHtml(e.numero_empleado)} · ${escapeHtml(e.nombre)} ${escapeHtml(e.apellidos)}</option>`
+  ).join('');
+  repInEmpleadosLoaded = true;
+}
+
+async function repInGenerar() {
+  repInTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Cargando…</td></tr>';
+  repInSummary.classList.add('hidden');
+  repInXlsx.disabled = true; repInPdf.disabled = true;
+
+  const empId = repInEmp.value ? Number(repInEmp.value) : null;
+  const res = await window.api.reporteInasistenciasPeriodo(repInIni.value, repInFin.value, empId);
+  if (!res?.ok) {
+    repInTbody.innerHTML = `<tr class="users-empty-row"><td colspan="5">${escapeHtml(res?.error || 'Error')}</td></tr>`;
+    return;
+  }
+  repInData = res;
+  const t = res.totales;
+
+  repInSummary.innerHTML = `
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Registros</span>
+      <span class="rep-summary-value rep-summary-value--xl">${t.registros}</span>
+      <span class="rep-summary-sub">inasistencias en el rango</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Total días</span>
+      <span class="rep-summary-value rep-summary-value--xl">${t.dias}</span>
+      <span class="rep-summary-sub">acumulado dentro del rango</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Justificados</span>
+      <span class="rep-summary-value rep-summary-value--xl">${t.dias_justificados}</span>
+      <span class="rep-summary-sub">días con motivo justificado</span>
+    </div>
+    <div class="rep-summary-card">
+      <span class="rep-summary-label">Injustificados</span>
+      <span class="rep-summary-value rep-summary-value--xl">${t.dias_injustificados}</span>
+      <span class="rep-summary-sub">días sin justificación</span>
+    </div>
+  `;
+  repInSummary.classList.remove('hidden');
+
+  if (!res.rows.length) {
+    repInTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Sin inasistencias en el rango.</td></tr>';
+    return;
+  }
+  repInTbody.innerHTML = res.rows.map((r) => {
+    const emp = r.empleado || {};
+    return `
+      <tr>
+        <td>
+          <div class="user-cell-text">
+            <div class="user-cell-name">${escapeHtml(emp.nombre || '')} ${escapeHtml(emp.apellidos || '')}</div>
+            <div class="user-cell-handle">#${escapeHtml(emp.numero_empleado || '')}</div>
+          </div>
+        </td>
+        <td><span class="user-cell-handle">${escapeHtml(fmtRange(r.fecha_ini, r.fecha_fin))}</span></td>
+        <td style="text-align:right;">${r.dias_efectivos}</td>
+        <td>
+          <div class="user-cell-text">
+            <div>${escapeHtml(r.motivo_tipo)}</div>
+            <div>${justBadge(r.justificada)}</div>
+          </div>
+        </td>
+        <td>${r.motivo_detalle ? escapeHtml(r.motivo_detalle) : '<span class="users-muted">—</span>'}</td>
+      </tr>
+    `;
+  }).join('');
+  repInXlsx.disabled = false; repInPdf.disabled = false;
+}
+
+repInBuscar.addEventListener('click', repInGenerar);
+
+function repInExportPayload(format) {
+  if (!repInData) return null;
+  const r = repInData.rango;
+  const t = repInData.totales;
+  const columns = [
+    { key: 'numero',    header: 'Número',        width: 12 },
+    { key: 'empleado',  header: 'Empleado',      width: 28 },
+    { key: 'desde',     header: 'Desde',         width: 14 },
+    { key: 'hasta',     header: 'Hasta',         width: 14 },
+    { key: 'dias',      header: 'Días',          width: 8 },
+    { key: 'motivo',    header: 'Motivo',        width: 22 },
+    { key: 'clase',     header: 'Clasificación', width: 16 },
+    { key: 'detalle',   header: 'Detalle',       width: 32 },
+    { key: 'registro',  header: 'Registró',      width: 14 },
+  ];
+  const data = repInData.rows.map((row) => {
+    const emp = row.empleado || {};
+    return {
+      numero: emp.numero_empleado || '',
+      empleado: `${emp.nombre || ''} ${emp.apellidos || ''}`.trim(),
+      desde: row.fecha_ini,
+      hasta: row.fecha_fin,
+      dias: row.dias_efectivos,
+      motivo: row.motivo_tipo,
+      clase: row.justificada ? 'Justificada' : 'Injustificada',
+      detalle: row.motivo_detalle || '',
+      registro: `@${row.registrado_por_username || ''}`,
+    };
+  });
+  if (format === 'xlsx') {
+    return {
+      title: `Inasistencias · ${r.ini} al ${r.fin}`,
+      columns, rows: data,
+      defaultBase: `inasistencias-${r.ini}_${r.fin}`,
+    };
+  }
+  const rowsHtml = data.map((row) => [
+    pdfMono('#' + row.numero),
+    row.empleado,
+    pdfMono(row.desde),
+    pdfMono(row.hasta),
+    pdfMono(String(row.dias)),
+    row.motivo,
+    {
+      html: `<span class="pdf-badge ${row.clase === 'Justificada' ? 'pdf-badge--in' : 'pdf-badge--out'}">${row.clase}</span>`,
+    },
+    row.detalle,
+  ]);
+  return {
+    title: 'Inasistencias por periodo',
+    subtitle: `Del ${fmtDateLong(r.ini)} al ${fmtDateLong(r.fin)}`,
+    summary: [
+      { label: 'Registros',     value: t.registros },
+      { label: 'Total días',    value: t.dias },
+      { label: 'Justificados',  value: t.dias_justificados },
+      { label: 'Injustificados', value: t.dias_injustificados },
+    ],
+    headers: ['Número', 'Empleado', 'Desde', 'Hasta', 'Días', 'Motivo', 'Clasificación', 'Detalle'],
+    rows: rowsHtml,
+    defaultBase: `inasistencias-${r.ini}_${r.fin}`,
+  };
+}
+
+repInXlsx.addEventListener('click', () => { const p = repInExportPayload('xlsx'); if (p) handleExport('xlsx', p); });
+repInPdf .addEventListener('click', () => { const p = repInExportPayload('pdf');  if (p) handleExport('pdf',  p); });

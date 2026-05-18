@@ -35,6 +35,17 @@ contextBridge.exposeInMainWorld('api', {
   deleteEvent: (id, password) =>
     ipcRenderer.invoke('registro:deleteEvent', { id, password }),
 
+  // Inasistencias
+  listInasistencias: (filtros) => ipcRenderer.invoke('inasistencias:list', filtros || {}),
+  createInasistencia: (payload) => ipcRenderer.invoke('inasistencias:create', payload),
+  updateInasistencia: (id, payload, password) =>
+    ipcRenderer.invoke('inasistencias:update', { id, payload, password }),
+  deleteInasistencia: (id, password) =>
+    ipcRenderer.invoke('inasistencias:delete', { id, password }),
+  openInasistenciaEvidencia: (id) =>
+    ipcRenderer.invoke('inasistencias:openEvidencia', { id }),
+  listInasistenciasEmpleados: () => ipcRenderer.invoke('inasistencias:listEmpleados'),
+
   // Dashboard
   getDashboardStats: (range) => ipcRenderer.invoke('dashboard:stats', { range }),
 
@@ -63,6 +74,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('reportes:horasDentroFuera', { ini, fin }),
   reporteHorasDentroFueraEmpleado: (empleadoId, ini, fin) =>
     ipcRenderer.invoke('reportes:horasDentroFueraEmpleado', { empleadoId, ini, fin }),
+  reporteInasistenciasPeriodo: (ini, fin, empleadoId) =>
+    ipcRenderer.invoke('reportes:inasistenciasPeriodo', { ini, fin, empleadoId }),
   reporteListEmpleados: () => ipcRenderer.invoke('reportes:listEmpleados'),
   exportReporteExcel: (payload) => ipcRenderer.invoke('reportes:exportExcel', payload),
   exportReportePdf: (payload) => ipcRenderer.invoke('reportes:exportPdf', payload),
