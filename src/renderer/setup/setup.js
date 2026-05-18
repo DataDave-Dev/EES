@@ -83,7 +83,10 @@ function showStep(next) {
 
 // ── Footer ─────────────────────────────────────────────────────
 function syncFooter() {
-  backBtn.style.visibility = (step > 0 && step < 3) ? 'visible' : 'hidden';
+  const showBack = step > 0 && step < 3;
+  backBtn.classList.toggle('is-invisible', !showBack);
+  backBtn.setAttribute('aria-hidden', showBack ? 'false' : 'true');
+  backBtn.tabIndex = showBack ? 0 : -1;
   let label;
   if (step === 0) label = 'Comenzar';
   else if (step === 1) label = 'Continuar';

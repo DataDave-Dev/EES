@@ -76,6 +76,26 @@
   --warn-bg: rgba(243, 188, 75, 0.15);
   --warn-fg: #a06a00;
   --success: #2ea66c;
+
+  /* Design tokens — typography scale.
+     Las variables son aditivas: los font-size existentes siguen siendo
+     valores literales para no romper composición visual. Úsalas en nuevo
+     CSS y, gradualmente, al refactorizar reglas. */
+  --text-xs:  11px;   /* labels, captions, metadata */
+  --text-sm:  12.5px; /* secondary text, hints */
+  --text-md:  13.5px; /* default body, table cells */
+  --text-lg:  15px;   /* form inputs, primary buttons */
+  --text-xl:  20px;   /* section titles (h2) */
+  --text-2xl: 22px;   /* page titles */
+
+  /* Design tokens — spacing scale (base 4px). */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
 }
 
 [data-theme='dark'] {
@@ -603,6 +623,76 @@ input:-webkit-autofill {
     color: var(--muted);
     margin-bottom: 10px;
   }
+
+  /* Tipografía de tarjetas de configuración (settings-card / wider settings views).
+     Reemplaza el patrón inline "font-size: 20px; font-weight: 600; ... margin: 0 0 4px"
+     y "color: var(--muted); font-size: 13.5px; margin: 0 0 16px". */
+  .settings-h2 {
+    margin: 0 0 4px;
+    font-size: var(--text-xl);
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    color: var(--text);
+  }
+  .settings-sub {
+    margin: 0 0 var(--space-4);
+    color: var(--muted);
+    font-size: var(--text-md);
+  }
+
+  /* Modal de confirmación destructiva.
+     Pregunta principal + label para campo de contraseña. */
+  .modal-confirm-text {
+    margin: 0 0 var(--space-1);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .modal-confirm-label {
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  /* Eyebrow tinted with accent color (was style="color: var(--accent)"). */
+  .identity-sub--accent { color: var(--accent); }
+
+  /* Login form padding (was inline style="padding: 22px 36px 26px"). */
+  .login-form { padding: 22px 36px 26px; }
+
+  /* Field-shell variante para textarea/contenido multilinea.
+     Antes: style="height: auto; padding: 8px 12px; align-items: flex-start". */
+  .field-shell--multiline {
+    height: auto;
+    padding: 8px 12px;
+    align-items: flex-start;
+  }
+  .field-shell--multiline textarea.field-input {
+    resize: vertical;
+    height: auto;
+    min-height: 32px;
+  }
+
+  /* Hint pequeño inline dentro de un label (p. ej. "(opcional)" como peso 400). */
+  .label-hint {
+    font-weight: 400;
+    font-size: 12px;
+  }
+
+  /* Modificador para anular el margen del field-hint cuando va inline en step-head. */
+  .field-hint--inline { margin: 0; }
+
+  /* Utility helper: oculta visualmente sin afectar layout (was style="visibility: hidden"). */
+  .is-invisible {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Hint en quick-add empleado (modal). Reduce el margen para acercarlo al primer
+     campo. Antes: style="margin-bottom: 4px". */
+  .em-auto-hint { margin-bottom: var(--space-1); }
+
+  /* Hint que se renderiza pegado al input anterior (margen negativo para
+     compensar el gap del flex). Antes: style="margin: -4px 0 0". */
+  .field-hint--tight { margin: -4px 0 0; }
   .theme-pill {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 cursor-pointer;
     border: 1px solid var(--border);

@@ -15,7 +15,7 @@
         <span>Volver</span>
       </button>
       <div class="regn-header-title">
-        <div class="identity-sub" style="color: var(--accent);">Asistencia</div>
+        <div class="identity-sub identity-sub--accent">Asistencia</div>
         <h1 class="regn-title" id="ina-page-title">Nueva inasistencia</h1>
       </div>
       <div></div>
@@ -101,8 +101,8 @@
               </label>
               <label class="field">
                 <span class="field-label">Detalle <span class="users-muted">(opcional)</span></span>
-                <span class="field-shell" style="height: auto; padding: 8px 12px; align-items: flex-start;">
-                  <textarea id="ina-motivo-detalle" class="field-input" rows="2" maxlength="500" autocomplete="off" style="resize: vertical; height: auto; min-height: 32px;"></textarea>
+                <span class="field-shell field-shell--multiline">
+                  <textarea id="ina-motivo-detalle" class="field-input" rows="2" maxlength="500" autocomplete="off"></textarea>
                 </span>
               </label>
             </div>
@@ -114,9 +114,9 @@
           <div class="reg-step-head">
             <div class="reg-step-title">
               <span class="reg-step-num">4</span>
-              <span class="reg-step-label">Evidencia <span class="users-muted" style="font-weight: 400; font-size: 12px;">(opcional)</span></span>
+              <span class="reg-step-label">Evidencia <span class="users-muted label-hint">(opcional)</span></span>
             </div>
-            <span class="field-hint" style="margin: 0;">PDF, PNG, JPG o WebP. Máx 5 MB.</span>
+            <span class="field-hint field-hint--inline">PDF, PNG, JPG o WebP. Máx 5 MB.</span>
           </div>
           <div class="reg-step-body">
             <div id="ina-evidencia-current" class="reg-status-line hidden">—</div>
@@ -132,7 +132,7 @@
         </section>
 
         <!-- Paso 5 (sólo edición): Confirmación -->
-        <section class="reg-step" id="ina-step-pw" data-step="5" style="display: none;">
+        <section class="reg-step hidden" id="ina-step-pw" data-step="5">
           <div class="reg-step-head">
             <div class="reg-step-title">
               <span class="reg-step-num">5</span>
