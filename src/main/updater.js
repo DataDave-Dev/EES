@@ -1,11 +1,14 @@
 const { app, autoUpdater, BrowserWindow } = require('electron');
+const https = require('node:https');
 
 const FEED_REPO = 'DataDave-Dev/EES';
 const CHECK_TIMEOUT_MS = 20000;
+const NOTES_FETCH_TIMEOUT_MS = 8000;
 
 let lastDownloaded = null;
 let lastAvailableVersion = null;
 let listenersAttached = false;
+const notesCache = new Map();
 
 function broadcast(channel, payload) {
   for (const w of BrowserWindow.getAllWindows()) {
@@ -64,6 +67,80 @@ function normalizeReleaseNotes(raw) {
   return raw.trim();
 }
 
+// Squirrel.Windows entrega <releaseNotes> desde el .nuspec embebido en el
+// .nupkg, que en nuestra build sale vacío. Como fallback consultamos la API
+// pública de GitHub para usar el cuerpo (markdown) del Release como notas.
+// Si falla cualquier cosa (red, rate limit, JSON inválido), devolvemos null
+// y el renderer mostrará su mensaje genérico — nunca debe romper el flujo.
+function fetchGithubReleaseNotes(versionOrTag) {
+  const tag = versionOrTag ? String(versionOrTag).trim() : '';
+  const normalized = tag ? (tag.startsWith('v') ? tag : `v${tag}`) : '';
+  if (normalized && notesCache.has(normalized)) {
+    return Promise.resolve(notesCache.get(normalized));
+  }
+
+  const apiPath = normalized
+    ? `/repos/${FEED_REPO}/releases/tags/${encodeURIComponent(normalized)}`
+    : `/repos/${FEED_REPO}/releases/latest`;
+
+  return new Promise((resolve) => {
+    let req;
+    try {
+      req = https.request({
+        hostname: 'api.github.com',
+        path: apiPath,
+        method: 'GET',
+        headers: {
+          'User-Agent': `${app.getName()}/${app.getVersion()}`,
+          'Accept': 'application/vnd.github+json',
+        },
+        timeout: NOTES_FETCH_TIMEOUT_MS,
+      }, (res) => {
+        // 404 con tag específico: el release puede estar publicado sin el
+        // prefijo "v", o el releaseName que pasó Squirrel no coincide; caemos
+        // a /releases/latest una sola vez para no entrar en bucle.
+        if (res.statusCode === 404 && normalized) {
+          res.resume();
+          fetchGithubReleaseNotes('').then(resolve);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          resolve(null);
+          return;
+        }
+        let data = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            const body = (json && typeof json.body === 'string') ? json.body.trim() : '';
+            if (body && normalized) notesCache.set(normalized, body);
+            resolve(body || null);
+          } catch {
+            resolve(null);
+          }
+        });
+        res.on('error', () => resolve(null));
+      });
+    } catch {
+      resolve(null);
+      return;
+    }
+    req.on('timeout', () => { try { req.destroy(); } catch (_) {} resolve(null); });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
+async function resolveReleaseNotes(rawNotes, releaseName) {
+  const fromSquirrel = normalizeReleaseNotes(rawNotes);
+  if (fromSquirrel) return fromSquirrel;
+  const fromGithub = await fetchGithubReleaseNotes(releaseName || lastAvailableVersion);
+  return fromGithub || null;
+}
+
 function attachPersistentListeners() {
   if (listenersAttached) return;
   listenersAttached = true;
@@ -80,11 +157,11 @@ function attachPersistentListeners() {
     broadcast('update:status', { status: 'not-available' });
   });
 
-  autoUpdater.on('update-downloaded', (_event, releaseNotes, releaseName) => {
-    const notes = normalizeReleaseNotes(releaseNotes);
+  autoUpdater.on('update-downloaded', async (_event, releaseNotes, releaseName) => {
+    const notes = await resolveReleaseNotes(releaseNotes, releaseName);
     lastDownloaded = {
       releaseName: releaseName || lastAvailableVersion || null,
-      releaseNotes: notes || null,
+      releaseNotes: notes,
       downloadedAt: new Date().toISOString(),
     };
     broadcast('update:downloaded', lastDownloaded);
@@ -179,13 +256,13 @@ function checkForUpdates() {
 
     const onAvailable = () => finish({ ok: true, status: 'available' });
     const onNotAvailable = () => finish({ ok: true, status: 'not-available' });
-    const onDownloaded = (_e, releaseNotes, releaseName) => {
-      const notes = normalizeReleaseNotes(releaseNotes);
+    const onDownloaded = async (_e, releaseNotes, releaseName) => {
+      const notes = await resolveReleaseNotes(releaseNotes, releaseName);
       finish({
         ok: true,
         status: 'downloaded',
         releaseName: releaseName || null,
-        releaseNotes: notes || null,
+        releaseNotes: notes,
       });
     };
     const onError = (err) => {
