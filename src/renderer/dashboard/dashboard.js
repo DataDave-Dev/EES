@@ -1553,7 +1553,7 @@ const VIEWS = {
   registro:                 { eyebrow: 'Asistencia',    title: 'Registro' },
   inasistencias:            { eyebrow: 'Asistencia',    title: 'Inasistencias' },
   empleados:                { eyebrow: 'Personal',      title: 'Empleados' },
-  'tipos-salida':           { eyebrow: 'Catálogos',     title: 'Motivos' },
+  'tipos-salida':           { eyebrow: 'Catálogos',     title: 'Motivos de salida' },
   'motivos-inasistencia':   { eyebrow: 'Catálogos',     title: 'Motivos de inasistencia' },
   'rep-asistencia-dia':     { eyebrow: 'Reportes',      title: 'Asistencia del día' },
   'rep-historial':          { eyebrow: 'Reportes',      title: 'Historial por empleado' },
@@ -1608,7 +1608,12 @@ function setReportesGroupOpen(open) {
 function switchView(key) {
   if (!VIEWS[key]) return;
   if (!PERMS.canSee(currentUser, key)) return;
-  navItems.forEach((b) => b.classList.toggle('is-active', b.dataset.view === key));
+  navItems.forEach((b) => {
+    const active = b.dataset.view === key;
+    b.classList.toggle('is-active', active);
+    if (active) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
   viewEls.forEach((v) => v.classList.toggle('is-active', v.dataset.view === key));
   eyebrowEl.textContent = VIEWS[key].eyebrow;
   titleEl.textContent = VIEWS[key].title;

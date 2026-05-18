@@ -62,6 +62,7 @@
   --text: #1a1d24;
   --muted: #6b7280;
   --placeholder: rgba(26, 29, 36, 0.35);
+  --muted-strong: #5b6470;
   --window-ring: rgba(26, 29, 36, 0.06);
   --window-shadow-1: rgba(26, 29, 36, 0.12);
   --window-shadow-2: rgba(26, 29, 36, 0.06);
@@ -69,6 +70,9 @@
   --hover: rgba(26, 29, 36, 0.05);
 
   --error: #e5484d;
+  --error-soft: rgba(229, 72, 77, 0.10);
+  --error-border: rgba(229, 72, 77, 0.30);
+  --error-hover: #d23a3f;
   --warn-bg: rgba(243, 188, 75, 0.15);
   --warn-fg: #a06a00;
   --success: #2ea66c;
@@ -87,6 +91,7 @@
   --text: #e8eaf0;
   --muted: #9aa3b2;
   --placeholder: rgba(232, 234, 240, 0.35);
+  --muted-strong: #b3bccb;
   --window-ring: rgba(255, 255, 255, 0.06);
   --window-shadow-1: rgba(0, 0, 0, 0.55);
   --window-shadow-2: rgba(0, 0, 0, 0.35);
@@ -176,6 +181,33 @@ input:-webkit-autofill {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Global focus-visible (a11y baseline — WCAG 2.4.7/2.4.11)
+   Aplica a todos los elementos interactivos sin importar la
+   clase. Solo se ve cuando el navegador detecta navegación
+   por teclado, no en clics de ratón.
+   ───────────────────────────────────────────── */
+:where(button, [role='button'], [role='tab'], [role='option'], a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.field-shell:focus-within { outline: none; }
+
+/* ─────────────────────────────────────────────
+   Reduced motion (a11y — WCAG 2.3.3)
+   Desactiva animaciones y transiciones para usuarios que
+   prefieren menos movimiento (p. ej. vestibular disorders).
+   ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -372,6 +404,17 @@ input:-webkit-autofill {
   .btn-ghost:hover {
     background: var(--hover);
     color: var(--text);
+  }
+
+  /* Danger variant — pintada como btn-primary pero con color de error.
+     Úsala en acciones destructivas (eliminar registro/inasistencia). */
+  .btn-danger {
+    background: var(--error);
+    box-shadow: 0 2px 6px rgba(229, 72, 77, 0.30);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: var(--error-hover);
+    box-shadow: 0 6px 18px rgba(229, 72, 77, 0.30);
   }
 
   /* App identity row */

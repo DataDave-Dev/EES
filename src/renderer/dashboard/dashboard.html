@@ -20,7 +20,7 @@
       </div>
 
       <nav class="sidebar-nav" id="sidebar-nav">
-        <button type="button" class="nav-item is-active" data-view="dashboard">
+        <button type="button" class="nav-item is-active" data-view="dashboard" aria-current="page">
           <span class="nav-icon" id="nav-icon-dashboard"></span>
           <span class="nav-label">Dashboard</span>
         </button>
@@ -46,7 +46,7 @@
             <div class="nav-group-children-inner">
               <button type="button" class="nav-item nav-sub" data-view="tipos-salida">
                 <span class="nav-icon" id="nav-icon-tipos-salida"></span>
-                <span class="nav-label">Motivos</span>
+                <span class="nav-label">Motivos de salida</span>
               </button>
               <button type="button" class="nav-item nav-sub" data-view="motivos-inasistencia">
                 <span class="nav-icon" id="nav-icon-motivos-inasistencia"></span>
@@ -158,9 +158,9 @@
             </div>
             <div class="dash-greeting-actions">
               <div class="dash-range" id="dash-range" role="tablist" aria-label="Rango">
-                <button type="button" class="dash-range-pill is-active" data-range="today" role="tab" aria-selected="true">Hoy</button>
-                <button type="button" class="dash-range-pill" data-range="7d" role="tab" aria-selected="false">7 días</button>
-                <button type="button" class="dash-range-pill" data-range="30d" role="tab" aria-selected="false">30 días</button>
+                <button type="button" class="dash-range-pill is-active" data-range="today" role="tab" aria-selected="true" title="Mostrar datos solo de hoy">Hoy</button>
+                <button type="button" class="dash-range-pill" data-range="7d" role="tab" aria-selected="false" title="Últimos 7 días">7 días</button>
+                <button type="button" class="dash-range-pill" data-range="30d" role="tab" aria-selected="false" title="Últimos 30 días">30 días</button>
               </div>
               <button type="button" id="dash-refresh" class="users-refresh-link">Actualizar</button>
             </div>
@@ -417,11 +417,11 @@
           </div>
         </section>
 
-        <!-- Motivos (sub-vista de Catálogos) -->
+        <!-- Motivos de salida (sub-vista de Catálogos) -->
         <section class="view" data-view="tipos-salida">
           <div class="users-toolbar">
             <div class="users-toolbar-info">
-              <h2 class="users-h2">Motivos</h2>
+              <h2 class="users-h2">Motivos de salida</h2>
               <p class="users-sub">
                 <span id="tipos-count">—</span> motivos registrados. Aplica a entradas y salidas.
                 <button type="button" id="tipos-refresh" class="users-refresh-link">Actualizar</button>
@@ -1150,7 +1150,7 @@
       </form>
       <footer class="modal-foot">
         <button type="button" class="btn-ghost-outline" data-inadelmodal-close>Cancelar</button>
-        <button type="submit" form="ina-del-form" id="ina-del-submit" class="btn-primary btn-primary--auto" style="background: var(--error);">Eliminar</button>
+        <button type="submit" form="ina-del-form" id="ina-del-submit" class="btn-primary btn-primary--auto btn-danger">Eliminar</button>
       </footer>
     </div>
   </div>
@@ -1288,7 +1288,7 @@
       </form>
       <footer class="modal-foot">
         <button type="button" class="btn-ghost-outline" data-delmodal-close>Cancelar</button>
-        <button type="submit" form="evt-del-form" id="evt-del-submit" class="btn-primary btn-primary--auto" style="background: var(--error);">Eliminar</button>
+        <button type="submit" form="evt-del-form" id="evt-del-submit" class="btn-primary btn-primary--auto btn-danger">Eliminar</button>
       </footer>
     </div>
   </div>

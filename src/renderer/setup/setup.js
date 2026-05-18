@@ -51,6 +51,8 @@ function renderStepper() {
   stepDots.forEach((el, i) => {
     el.classList.toggle('is-done', i < step);
     el.classList.toggle('is-current', i === step);
+    if (i === step) el.setAttribute('aria-current', 'step');
+    else el.removeAttribute('aria-current');
     const dot = el.querySelector('.step-dot');
     if (i < step) dot.innerHTML = I.check(12);
     else if (i === step) dot.textContent = String(i + 1);
@@ -145,6 +147,7 @@ function renderStrength() {
 function renderEye() {
   eyeBtn.innerHTML = pwVisible ? I.eyeOff(17) : I.eye(17);
   eyeBtn.setAttribute('aria-label', pwVisible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+  eyeBtn.setAttribute('aria-pressed', pwVisible ? 'true' : 'false');
   passEl.type = pwVisible ? 'text' : 'password';
   pass2El.type = pwVisible ? 'text' : 'password';
 }

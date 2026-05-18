@@ -41,6 +41,7 @@ let pwVisible = false;
 function renderEye() {
   eyeBtn.innerHTML = pwVisible ? I.eyeOff(17) : I.eye(17);
   eyeBtn.setAttribute('aria-label', pwVisible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+  eyeBtn.setAttribute('aria-pressed', pwVisible ? 'true' : 'false');
   passInput.type = pwVisible ? 'text' : 'password';
 }
 eyeBtn.addEventListener('mousedown', (e) => e.preventDefault());
