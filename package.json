@@ -1,7 +1,7 @@
 {
   "name": "ees",
   "productName": "Onix",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Onix — aplicación de escritorio para control de asistencia (Electron + SQLite).",
   "main": "src/index.js",
   "private": true,
