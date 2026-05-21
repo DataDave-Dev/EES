@@ -549,13 +549,35 @@
 
           <div class="rep-filter-bar">
             <div class="rep-filter-item">
-              <span class="rep-filter-item-label">Fecha</span>
+              <span class="rep-filter-item-label">Periodo</span>
+              <span class="rep-filter-shell select-shell">
+                <select id="rep-ad-periodo" class="rep-filter-input field-select">
+                  <option value="2">Últimos 2 días</option>
+                  <option value="3">Últimos 3 días</option>
+                  <option value="6">Últimos 6 días</option>
+                  <option value="7" selected>Últimos 7 días</option>
+                  <option value="15">Últimos 15 días</option>
+                  <option value="30">Últimos 30 días</option>
+                  <option value="custom">Personalizado</option>
+                </select>
+              </span>
+            </div>
+            <div class="rep-filter-item hidden" id="rep-ad-ini-wrap">
+              <span class="rep-filter-item-label">Desde</span>
               <span class="rep-filter-shell">
-                <input type="date" id="rep-ad-fecha" class="rep-filter-input" />
+                <input type="date" id="rep-ad-ini" class="rep-filter-input" />
+              </span>
+            </div>
+            <div class="rep-filter-item hidden" id="rep-ad-fin-wrap">
+              <span class="rep-filter-item-label">Hasta</span>
+              <span class="rep-filter-shell">
+                <input type="date" id="rep-ad-fin" class="rep-filter-input" />
               </span>
             </div>
             <button type="button" id="rep-ad-buscar" class="btn-primary rep-generate-btn">Generar reporte</button>
           </div>
+
+          <div id="rep-ad-summary" class="rep-summary hidden" aria-live="polite"></div>
 
           <div class="window users-card">
             <div class="users-table-wrap">
@@ -570,7 +592,7 @@
                   </tr>
                 </thead>
                 <tbody id="rep-ad-tbody">
-                  <tr class="users-empty-row"><td colspan="5">Selecciona una fecha y presiona Generar.</td></tr>
+                  <tr class="users-empty-row"><td colspan="5">Elige un periodo y presiona Generar.</td></tr>
                 </tbody>
               </table>
             </div>

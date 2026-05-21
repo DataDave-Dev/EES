@@ -64,8 +64,8 @@ contextBridge.exposeInMainWorld('api', {
   auditListUsers: () => ipcRenderer.invoke('audit:listUsers'),
 
   // Reportes
-  reporteAsistenciaDia: (fecha) =>
-    ipcRenderer.invoke('reportes:asistenciaDia', { fecha }),
+  reporteAsistenciaPeriodo: (ini, fin) =>
+    ipcRenderer.invoke('reportes:asistenciaPeriodo', { ini, fin }),
   reporteHistorial: (empleadoId, ini, fin) =>
     ipcRenderer.invoke('reportes:historial', { empleadoId, ini, fin }),
   reporteSalidasMotivo: (ini, fin) =>

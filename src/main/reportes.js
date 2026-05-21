@@ -80,20 +80,12 @@ function stmts() {
     u.username AS registrado_por_username
   `;
   S = {
-    asistenciaDiaFecha: db.prepare(`
+    asistenciaRango: db.prepare(`
       SELECT ${eventCols}
       FROM registro_eventos e
       JOIN empleados emp ON emp.id = e.empleado_id
       JOIN users u       ON u.id   = e.registrado_por
-      WHERE date(e.timestamp, 'localtime') = ?
-      ORDER BY e.timestamp ASC
-    `),
-    asistenciaDiaHoy: db.prepare(`
-      SELECT ${eventCols}
-      FROM registro_eventos e
-      JOIN empleados emp ON emp.id = e.empleado_id
-      JOIN users u       ON u.id   = e.registrado_por
-      WHERE date(e.timestamp, 'localtime') = date('now', 'localtime')
+      WHERE date(e.timestamp, 'localtime') BETWEEN ? AND ?
       ORDER BY e.timestamp ASC
     `),
     empleadoById: db.prepare('SELECT * FROM empleados WHERE id = ?'),
@@ -153,11 +145,43 @@ function stmts() {
   return S;
 }
 
-// fecha: 'YYYY-MM-DD' (local). Si no se pasa, usa hoy local.
-function asistenciaDia(fecha) {
+const RE_FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+// Reporte de asistencia para un rango de días [ini, fin] inclusivo.
+// Devuelve los eventos y un resumen con totales y cantidad de días con
+// actividad. Las fechas se interpretan en zona horaria local.
+function asistenciaPeriodo(fechaIni, fechaFin) {
+  const ini = (fechaIni || '').trim();
+  const fin = (fechaFin || '').trim();
+  if (!ini || !fin) return { ok: false, error: 'Selecciona rango de fechas' };
+  if (!RE_FECHA_ISO.test(ini) || !RE_FECHA_ISO.test(fin)) {
+    return { ok: false, error: 'Formato de fecha inválido (YYYY-MM-DD)' };
+  }
+  if (ini > fin) return { ok: false, error: 'La fecha inicial debe ser anterior o igual a la final' };
+
   const s = stmts();
-  const f = (fecha || '').trim();
-  return f ? s.asistenciaDiaFecha.all(f) : s.asistenciaDiaHoy.all();
+  const eventos = s.asistenciaRango.all(ini, fin);
+
+  const diasConEventos = new Set();
+  let entradas = 0;
+  let salidas = 0;
+  for (const ev of eventos) {
+    diasConEventos.add(ev.timestamp.slice(0, 10));
+    if (ev.tipo === 'entrada') entradas += 1;
+    else if (ev.tipo === 'salida') salidas += 1;
+  }
+
+  return {
+    ok: true,
+    rango: { ini, fin },
+    eventos,
+    resumen: {
+      totalEventos: eventos.length,
+      entradas,
+      salidas,
+      dias: diasConEventos.size,
+    },
+  };
 }
 
 function historialEmpleado(empleadoId, fechaIni, fechaFin) {
@@ -488,7 +512,7 @@ function inasistenciasPorPeriodo(fechaIni, fechaFin, empleadoId = null) {
 }
 
 module.exports = {
-  asistenciaDia,
+  asistenciaPeriodo,
   historialEmpleado,
   salidasPorMotivo,
   horasDentroFuera,

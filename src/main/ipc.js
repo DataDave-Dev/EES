@@ -660,11 +660,10 @@ function registerIpc() {
   );
 
   ipcMain.handle(
-    'reportes:asistenciaDia',
-    requirePerm('reportes', async (_e, { fecha } = {}) => ({
-      ok: true,
-      eventos: reportes.asistenciaDia(fecha),
-    }))
+    'reportes:asistenciaPeriodo',
+    requirePerm('reportes', async (_e, { ini, fin } = {}) =>
+      reportes.asistenciaPeriodo(ini, fin)
+    )
   );
 
   ipcMain.handle(

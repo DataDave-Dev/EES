@@ -1878,13 +1878,13 @@ permsSaveBtn.addEventListener('click', async () => {
   'rep-ad-pdf-icon', 'rep-hi-pdf-icon', 'rep-sm-pdf-icon',
 ].forEach((id) => { document.getElementById(id).innerHTML = I.filePdf(14); });
 
-function todayLocalISO() {
-  const d = new Date();
+function localISO(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
+function todayLocalISO() { return localISO(new Date()); }
 
 // PDF cell helpers — produce { html } objects to bypass escaping for badges/bars.
 function pdfTipoBadge(tipo) {
@@ -1913,33 +1913,115 @@ async function handleExport(action, payload) {
   }
 }
 
-// ── Reporte 1: Asistencia del día ─────────────────────────────
-const repAdFecha = document.getElementById('rep-ad-fecha');
+// ── Reporte 1: Asistencia (periodo) ───────────────────────────
+const repAdPeriodo = document.getElementById('rep-ad-periodo');
+const repAdIni = document.getElementById('rep-ad-ini');
+const repAdFin = document.getElementById('rep-ad-fin');
+const repAdIniWrap = document.getElementById('rep-ad-ini-wrap');
+const repAdFinWrap = document.getElementById('rep-ad-fin-wrap');
 const repAdTbody = document.getElementById('rep-ad-tbody');
 const repAdBuscar = document.getElementById('rep-ad-buscar');
+const repAdSummary = document.getElementById('rep-ad-summary');
 const repAdXlsx = document.getElementById('rep-ad-xlsx');
 const repAdPdf = document.getElementById('rep-ad-pdf');
 let repAdRows = [];
+let repAdResumen = null;
+let repAdRango = { ini: '', fin: '' };
 
-repAdFecha.value = todayLocalISO();
+// "Últimos N días" incluye hoy: rango [hoy-(N-1), hoy] en hora local.
+function repAdRangoDesdePreset(n) {
+  const hoy = new Date();
+  const desde = new Date(hoy);
+  desde.setDate(desde.getDate() - (n - 1));
+  return { ini: localISO(desde), fin: localISO(hoy) };
+}
+
+function repAdAplicarPreset() {
+  const val = repAdPeriodo.value;
+  if (val === 'custom') {
+    repAdIniWrap.classList.remove('hidden');
+    repAdFinWrap.classList.remove('hidden');
+    if (!repAdIni.value || !repAdFin.value) {
+      const r = repAdRangoDesdePreset(7);
+      repAdIni.value = r.ini;
+      repAdFin.value = r.fin;
+    }
+    return;
+  }
+  repAdIniWrap.classList.add('hidden');
+  repAdFinWrap.classList.add('hidden');
+  const r = repAdRangoDesdePreset(Number(val));
+  repAdIni.value = r.ini;
+  repAdFin.value = r.fin;
+}
+
+repAdPeriodo.addEventListener('change', repAdAplicarPreset);
+repAdAplicarPreset();
+
+function repAdEsDiaUnico() {
+  return repAdRango.ini && repAdRango.fin && repAdRango.ini === repAdRango.fin;
+}
+
+function repAdRenderSummary() {
+  if (!repAdResumen) {
+    repAdSummary.classList.add('hidden');
+    repAdSummary.innerHTML = '';
+    return;
+  }
+  const { totalEventos, entradas, salidas, dias } = repAdResumen;
+  repAdSummary.innerHTML = `
+    <div class="rep-summary-item">
+      <span class="rep-summary-label">Rango</span>
+      <span class="rep-summary-value">${escapeHtml(repAdRango.ini)} → ${escapeHtml(repAdRango.fin)}</span>
+    </div>
+    <div class="rep-summary-item">
+      <span class="rep-summary-label">Total eventos</span>
+      <span class="rep-summary-value">${totalEventos}</span>
+    </div>
+    <div class="rep-summary-item">
+      <span class="rep-summary-label">Entradas</span>
+      <span class="rep-summary-value">${entradas}</span>
+    </div>
+    <div class="rep-summary-item">
+      <span class="rep-summary-label">Salidas</span>
+      <span class="rep-summary-value">${salidas}</span>
+    </div>
+    <div class="rep-summary-item">
+      <span class="rep-summary-label">Días</span>
+      <span class="rep-summary-value">${dias}</span>
+    </div>
+  `;
+  repAdSummary.classList.remove('hidden');
+}
 
 async function repAdGenerar() {
+  const ini = repAdIni.value;
+  const fin = repAdFin.value;
+  if (!ini || !fin) { EES_TOAST.error('Selecciona un rango válido.'); return; }
+  if (ini > fin) { EES_TOAST.error('La fecha inicial no puede ser mayor a la final.'); return; }
+
   repAdTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Cargando…</td></tr>';
-  const res = await window.api.reporteAsistenciaDia(repAdFecha.value);
+  repAdSummary.classList.add('hidden');
+  const res = await window.api.reporteAsistenciaPeriodo(ini, fin);
   if (!res?.ok) {
+    repAdRows = []; repAdResumen = null; repAdRango = { ini, fin };
     repAdTbody.innerHTML = `<tr class="users-empty-row"><td colspan="5">${escapeHtml(res?.error || 'Error')}</td></tr>`;
     repAdXlsx.disabled = true; repAdPdf.disabled = true;
     return;
   }
-  repAdRows = res.eventos;
-  if (!repAdRows.length) {
-    repAdTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Sin eventos en esa fecha.</td></tr>';
+  repAdRows = res.eventos || [];
+  repAdResumen = res.resumen || null;
+  repAdRango = res.rango || { ini, fin };
+  repAdRenderSummary();
+
+  if (!repAdResumen || repAdResumen.totalEventos === 0) {
+    repAdTbody.innerHTML = '<tr class="users-empty-row"><td colspan="5">Sin eventos en ese periodo.</td></tr>';
     repAdXlsx.disabled = true; repAdPdf.disabled = true;
     return;
   }
   repAdTbody.innerHTML = repAdRows.map((ev) => `
     <tr>
-      <td><span class="user-cell-handle">${fmtDateTime(ev.timestamp)}</span></td>
+      <td><span class="user-cell-handle">${escapeHtml(fmtDateTime(ev.timestamp))}</span></td>
       <td>
         <div class="user-cell">
           <div class="user-cell-text">
@@ -1959,7 +2041,10 @@ async function repAdGenerar() {
 repAdBuscar.addEventListener('click', repAdGenerar);
 
 function repAdExportPayload(format) {
-  const fecha = repAdFecha.value || todayLocalISO();
+  const { ini, fin } = repAdRango;
+  const unico = repAdEsDiaUnico();
+  const tituloBase = unico ? `Asistencia del día · ${ini}` : `Asistencia · ${ini} a ${fin}`;
+  const defaultBase = unico ? `asistencia-${ini}` : `asistencia-${ini}_a_${fin}`;
   const columns = [
     { key: 'fechaHora', header: 'Fecha y hora', width: 22 },
     { key: 'numero',    header: 'Número',       width: 12 },
@@ -1980,12 +2065,10 @@ function repAdExportPayload(format) {
   }));
   if (format === 'xlsx') {
     return {
-      title: `Asistencia del día · ${fecha}`,
-      columns, rows: data, defaultBase: `asistencia-${fecha}`,
+      title: tituloBase,
+      columns, rows: data, defaultBase,
     };
   }
-  const entradas = repAdRows.filter((e) => e.tipo === 'entrada').length;
-  const salidas = repAdRows.filter((e) => e.tipo === 'salida').length;
   const rowsHtml = data.map((r) => [
     pdfMono(r.fechaHora),
     pdfMono('#' + r.numero),
@@ -1995,17 +2078,20 @@ function repAdExportPayload(format) {
     r.detalle,
     { html: `<span class="pdf-num">@${escapeHtml(r.usuario.slice(1))}</span>` },
   ]);
+  const subtitle = unico ? fmtDateLong(ini) : `${fmtDateLong(ini)} → ${fmtDateLong(fin)}`;
+  const r = repAdResumen || { totalEventos: repAdRows.length, entradas: 0, salidas: 0, dias: 0 };
   return {
-    title: 'Asistencia del día',
-    subtitle: fmtDateLong(fecha),
+    title: unico ? 'Asistencia del día' : 'Asistencia por periodo',
+    subtitle,
     summary: [
-      { label: 'Total eventos', value: repAdRows.length },
-      { label: 'Entradas',      value: entradas },
-      { label: 'Salidas',       value: salidas },
+      { label: 'Total eventos', value: r.totalEventos },
+      { label: 'Entradas',      value: r.entradas },
+      { label: 'Salidas',       value: r.salidas },
+      { label: 'Días',          value: r.dias },
     ],
     headers: ['Fecha y hora', 'Número', 'Empleado', 'Tipo', 'Motivo', 'Detalle', 'Registró'],
     rows: rowsHtml,
-    defaultBase: `asistencia-${fecha}`,
+    defaultBase,
   };
 }
 
@@ -2028,7 +2114,7 @@ let repHiEmpleadosLoaded = false;
 (function initRepHiDates() {
   const today = new Date();
   const past = new Date(today); past.setDate(past.getDate() - 30);
-  repHiIni.value = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`;
+  repHiIni.value = localISO(past);
   repHiFin.value = todayLocalISO();
 })();
 
